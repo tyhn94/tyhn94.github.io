@@ -1798,5 +1798,134 @@
     </script>
                 <!-- Generatif arka plan scriptini buraya ekliyoruz -->
     <script src="generative-bg.js"></script>
+                <!-- Zafer Efekti ve Chime Scripti -->
+    <script>
+    (function() {
+        let fireworksFired = false;
+
+        function playVictoryChime() {
+            // Kullanıcı sesi kapattıysa çalma
+            const isMuted = localStorage.getItem("daredrop_sound") === "off";
+            if (isMuted) return;
+
+            try {
+                let ctx = window.audioContext || new (window.AudioContext || window.webkitAudioContext)();
+                if (ctx.state === 'suspended') ctx.resume();
+
+                const now = ctx.currentTime;
+                // Retro zafer arpeji (C5, E5, G5, C6)
+                const notes = [523.25, 659.25, 783.99, 1046.50];
+
+                notes.forEach((freq, i) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    
+                    osc.type = 'square';
+                    osc.frequency.value = freq;
+                    
+                    const t = now + (i * 0.12); // Notalar arası hızlı geçiş
+                    
+                    gain.gain.setValueAtTime(0, t);
+                    gain.gain.linearRampToValueAtTime(0.15, t + 0.02);
+                    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+                    
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    
+                    osc.start(t);
+                    osc.stop(t + 0.45);
+                });
+            } catch (e) {}
+        }
+
+        function triggerFireworks() {
+            const canvas = document.createElement('canvas');
+            canvas.style.position = 'fixed';
+            canvas.style.top = '0';
+            canvas.style.left = '0';
+            canvas.style.width = '100vw';
+            canvas.style.height = '100vh';
+            canvas.style.zIndex = '9999'; // Her şeyin üstünde
+            canvas.style.pointerEvents = 'none';
+            canvas.style.imageRendering = 'pixelated'; // Retro görünüm
+            document.body.appendChild(canvas);
+            
+            const ctx = canvas.getContext('2d');
+            // Düşük çözünürlük ile maksimum performans
+            canvas.width = window.innerWidth / 4;
+            canvas.height = window.innerHeight / 4;
+            
+            const particles = [];
+            // Sitenin tema renkleri: Neon Yeşil, Aksan Kırmızı, Timer Mavi, Admin Turuncu
+            const colors = ['#33ff00', '#ff0055', '#00e5ff', '#ffaa00']; 
+            const cx = canvas.width / 2;
+            const cy = canvas.height / 2.5;
+            
+            for(let i=0; i < 70; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 1 + Math.random() * 4.5;
+                particles.push({
+                    x: cx,
+                    y: cy,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    life: 1.0,
+                    decay: 0.01 + Math.random() * 0.02
+                });
+            }
+            
+            function render() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                let alive = false;
+                
+                particles.forEach(p => {
+                    if(p.life > 0) {
+                        alive = true;
+                        p.x += p.vx;
+                        p.y += p.vy;
+                        p.vy += 0.08; // Yerçekimi hissi
+                        p.life -= p.decay;
+                        
+                        ctx.fillStyle = p.color;
+                        ctx.globalAlpha = Math.max(0, p.life);
+                        ctx.fillRect(Math.floor(p.x), Math.floor(p.y), 2, 2); // İri pikseller
+                    }
+                });
+                
+                if(alive) {
+                    requestAnimationFrame(render);
+                } else {
+                    canvas.remove(); // İş bitince DOM'dan temizle
+                }
+            }
+            render();
+            playVictoryChime();
+        }
+
+        // Arayüzdeki "survival-status" elementini dinleyen gözlemci
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                const text = mutation.target.innerText || "";
+                if (text.includes("ROUND OVER!")) {
+                    if (!fireworksFired) {
+                        triggerFireworks();
+                        fireworksFired = true;
+                    }
+                } else if (text.includes("WAITING FOR ADMIN") || text.includes("THE CHALLENGE")) {
+                    // Yeni tur başladığında tetikleyiciyi sıfırla
+                    fireworksFired = false;
+                }
+            });
+        });
+
+        // Sayfa yüklendiğinde gözlemciyi başlat
+        window.addEventListener('load', () => {
+            const statusEl = document.getElementById('survival-status');
+            if (statusEl) {
+                observer.observe(statusEl, { childList: true, characterData: true, subtree: true });
+            }
+        });
+    })();
 </body>
 </html>
