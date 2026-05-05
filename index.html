@@ -115,7 +115,7 @@
             100% { opacity: 1; transform: scale(1); }
         }
 
-        /* Global stats — TOTAL XP + rank text */
+        /* Global stats - TOTAL XP + rank text */
         .rank-text {
             font-size: 14px; font-weight: bold;
             color: #ffd700; text-shadow: 0 0 8px rgba(255, 215, 0, 0.5);
@@ -125,7 +125,7 @@
         .global-lb-row.is-me { background: #001a00 !important; padding: 8px !important; border-left: 2px solid var(--text-main); }
         .global-lb-row .rank-num { color: var(--timer-color); font-weight: bold; margin-right: 8px; min-width: 28px; display: inline-block; }
 
-        /* Sound toggle — fixed top-right, persists across all screens */
+        /* Sound toggle - fixed top-right, persists across all screens */
         #sound-toggle {
             position: fixed; top: 12px; right: 12px; z-index: 50;
             background: #111; border: 1px solid var(--text-main); color: var(--text-main);
@@ -166,7 +166,7 @@
                 <p style="margin: 0 0 5px; font-size: 12px; color: #888;">> TOTAL XP EARNED</p>
                 <div style="font-size: 38px; color: var(--text-accent); font-weight: bold; line-height: 1;" id="user-total-xp">0</div>
                 <div id="rank-display" style="display: none; margin: 8px 0 0;">
-                    <span class="rank-text">#<span id="rank-popup-num">—</span> globally</span>
+                    <span class="rank-text">#<span id="rank-popup-num">-</span> globally</span>
                 </div>
                 <p style="margin: 8px 0 0; font-size: 11px; color: #888;">Across all groups & rounds</p>
             </div>
@@ -222,7 +222,7 @@
                     <input type="checkbox" id="public-voting-checkbox" style="width: 18px; height: 18px;">
                     Enable Public Voting
                 </label>
-                <p style="font-size: 11px; color: #888; margin: 5px 0 0 28px;">Anyone with the public link can vote anonymously. Round won't end early — waits for full timer.</p>
+                <p style="font-size: 11px; color: #888; margin: 5px 0 0 28px;">Anyone with the public link can vote anonymously. Round won't end early - waits for full timer.</p>
                 <button class="btn btn-admin" id="btn-save-admin" style="padding: 8px; margin-top: 15px; font-size: 14px;">Save Settings</button>
             </div>
 
@@ -255,8 +255,7 @@
                 </div>
 
                 <div id="interaction-section" style="margin-top: 15px;">
-                    <!-- Dynamic Interactions render here -->
-                </div>
+                    </div>
             </div>
 
             <button class="btn" style="border-color: var(--timer-color); color: var(--timer-color);" onclick="window.showHistory()">View Past Challenges</button>
@@ -306,7 +305,6 @@
         <div class="status" id="system-status">Version: MVP v7.0 // Status: Enhanced Admin Menu</div>
     </div>
 
-    <!-- Category picker overlay (mobile-friendly modal) -->
     <div id="category-overlay" class="overlay-backdrop" onclick="if(event.target===this)closeCategoryOverlay()">
         <div class="overlay-sheet">
             <h2 style="font-size: 18px;">SELECT CATEGORY</h2>
@@ -316,7 +314,6 @@
         </div>
     </div>
 
-    <!-- Global leaderboard overlay -->
     <div id="global-leaderboard-overlay" class="overlay-backdrop" onclick="if(event.target===this)closeGlobalLeaderboardOverlay()">
         <div class="overlay-sheet">
             <h2 style="font-size: 18px;">GLOBAL LEADERBOARD</h2>
@@ -328,7 +325,6 @@
         </div>
     </div>
 
-    <!-- Firebase SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
         import { getFirestore, collection, doc, setDoc, getDoc, updateDoc, arrayUnion, deleteDoc, increment, query, orderBy, limit, getDocs, where, getCountFromServer } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
@@ -360,7 +356,7 @@
         const inviteGroupId = urlParams.get('groupId');
         const publicVoteIdFromUrl = urlParams.get('publicVoteId');
 
-        // Anonymous public-voter ID — persisted per-device for abuse protection.
+        // Anonymous public-voter ID - persisted per-device for abuse protection.
         // One ID = one vote allowed per submission. Cleared with localStorage by user.
         function getPublicVoterId() {
             let pid = localStorage.getItem("daredrop_public_voter_id");
@@ -371,7 +367,7 @@
             return pid;
         }
 
-        // Fallback data — used if challenges.json fails to load (network, parse, etc.)
+        // Fallback data - used if challenges.json fails to load (network, parse, etc.)
         // Keep this small but functional. The "real" data lives in challenges.json.
         const FALLBACK_CHALLENGE_DATA = {
             version: 0,
@@ -403,7 +399,7 @@
         let challengeData = FALLBACK_CHALLENGE_DATA;
         let challengeDataLoaded = false;
 
-        // Load challenges from sibling JSON file. Same-origin → no CORS issues.
+        // Load challenges from sibling JSON file. Same-origin -> no CORS issues.
         // Cache-busting via ?v=... is optional; HTTP cache works fine for most cases.
         async function loadChallengeData() {
             try {
@@ -436,7 +432,7 @@
             return cat.challenges[Math.floor(Math.random() * cat.challenges.length)];
         }
 
-        // Kick off the load immediately — auth + UI may already wait for it implicitly.
+        // Kick off the load immediately - auth + UI may already wait for it implicitly.
         loadChallengeData();
 
         window.showScreen = function(screenId) {
@@ -446,7 +442,7 @@
 
         onAuthStateChanged(auth, async (user) => {
             if (user) {
-                // Public-vote links bypass login completely — anyone can vote anonymously.
+                // Public-vote links bypass login completely - anyone can vote anonymously.
                 if (publicVoteIdFromUrl) {
                     await loadPublicVotePage(publicVoteIdFromUrl);
                     return;
@@ -504,7 +500,7 @@
             if (countdownTimer) clearInterval(countdownTimer); 
             document.getElementById('display-username').innerText = userData.name;
 
-            // Kick off global stats in parallel — don't block group rendering on it.
+            // Kick off global stats in parallel - don't block group rendering on it.
             loadGlobalStats();
 
             const container = document.getElementById('group-list-container');
@@ -700,7 +696,7 @@
 
             // Auto-resolve early if every member has both submitted and voted.
             // The check mirrors resolveChallengeAndKick's per-member logic.
-            // SKIPPED when public voting is enabled — round must wait for full timer
+            // SKIPPED when public voting is enabled - round must wait for full timer
             // so external voters get the entire window to weigh in.
             if (status === 'active' && currentGroupData.members.length > 0 && !currentGroupData.publicVotingEnabled) {
                 const allComplete = currentGroupData.members.every(member => {
@@ -719,7 +715,7 @@
             document.getElementById('current-count').innerText = currentGroupData.members.length;
             document.getElementById('max-count').innerText = currentGroupData.maxMembers;
             
-            const activeChallenge = currentGroupData.currentChallenge || (challengeData.categories[0]?.challenges[0]) || "—";
+            const activeChallenge = currentGroupData.currentChallenge || (challengeData.categories[0]?.challenges[0]) || "-";
             document.getElementById('daily-challengeText').innerText = '"' + activeChallenge + '"';
 
             document.getElementById('admin-panel').style.display = isAdmin ? 'block' : 'none';
@@ -744,7 +740,7 @@
                 document.getElementById('invite-section').style.display = 'block';
             }
 
-            // Public voting status — visible to ALL members so they know the rules.
+            // Public voting status - visible to ALL members so they know the rules.
             const pvCard = document.getElementById('public-vote-status');
             const pvLabel = document.getElementById('pv-status-label');
             const pvDesc = document.getElementById('pv-status-desc');
@@ -755,7 +751,7 @@
                 pvLabel.innerText = 'ON';
                 pvLabel.style.color = '#ff66cc';
                 pvDesc.innerText = 'Outsiders can vote anonymously via the public link. Round runs the full timer.';
-                pvCopyBtn.style.display = 'block'; // ALL members can share — viral.
+                pvCopyBtn.style.display = 'block'; // ALL members can share - viral.
             } else {
                 pvCard.style.borderColor = '#444';
                 pvLabel.innerText = 'OFF';
@@ -917,23 +913,32 @@
             });
         }
 
-        // Detect Instagram (post/reel) and TikTok URLs and return an iframe embed.
-        // Returns null for unsupported URLs so caller can show a fallback.
+        // Detect YouTube, Instagram, or TikTok URLs and return an iframe embed.
+        // Returns null for unsupported URLs to enforce valid platforms.
         function getEmbedHtml(url) {
             if (!url || typeof url !== 'string') return null;
 
-            // Instagram post or reel: instagram.com/p/SHORTCODE or instagram.com/reel/SHORTCODE
-            const igMatch = url.match(/instagram\.com\/(p|reel)\/([A-Za-z0-9_-]+)/);
+            // YouTube Match
+            const ytMatch = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=|shorts\/))([\w-]{11})/);
+            if (ytMatch) {
+                const id = ytMatch[1];
+                return `<iframe src="https://www.youtube.com/embed/${id}"
+                            width="100%" height="315" frameborder="0"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen
+                            style="border:1px solid #333; background:#000; max-width:500px; display:block;"></iframe>`;
+            }
+
+            // Instagram Match
+            const igMatch = url.match(/instagram\.com\/(?:p|reel|reels)\/([A-Za-z0-9_-]+)/);
             if (igMatch) {
-                const type = igMatch[1];
-                const id = igMatch[2];
-                return `<iframe src="https://www.instagram.com/${type}/${id}/embed/" 
+                const id = igMatch[1];
+                return `<iframe src="https://www.instagram.com/p/${id}/embed/" 
                             width="100%" height="540" frameborder="0" scrolling="no" allowtransparency="true"
                             loading="lazy"
                             style="border:1px solid #333; background:#000; max-width:500px; display:block;"></iframe>`;
             }
 
-            // TikTok video with numeric ID: tiktok.com/@user/video/1234567890
+            // TikTok Match
             const ttMatch = url.match(/tiktok\.com\/@[^/]+\/video\/(\d+)/);
             if (ttMatch) {
                 const id = ttMatch[1];
@@ -943,13 +948,18 @@
                             style="border:1px solid #333; background:#000; max-width:325px; display:block;"></iframe>`;
             }
 
-            // Unsupported (vm.tiktok.com short links, screenshots, private accounts, other platforms)
             return null;
         }
 
         window.submitProof = async function() {
             const linkInput = document.getElementById('proof-link-input').value.trim();
             if (!linkInput) return alert("Please paste a link to your post/story.");
+            
+            // Link doğrulaması: Sadece YouTube, TikTok veya Instagram embedleri geçerlidir
+            const embedHtml = getEmbedHtml(linkInput);
+            if (!embedHtml) {
+                return alert("Geçersiz link! Lütfen sadece YouTube, TikTok veya Instagram linki giriniz.");
+            }
             
             const groupRef = doc(db, "groups", currentGroupId);
             await updateDoc(groupRef, {
@@ -965,7 +975,7 @@
                 [`leaderboard.${targetUser}`]: increment(points)
             });
 
-            // Cumulative global XP — survives rerolls (group leaderboard resets, this doesn't).
+            // Cumulative global XP - survives rerolls (group leaderboard resets, this doesn't).
             try {
                 await updateDoc(doc(db, "users", targetUser.toLowerCase()), {
                     totalXp: increment(points)
@@ -983,7 +993,7 @@
             currentGroupData.leaderboard[targetUser] = (currentGroupData.leaderboard[targetUser] || 0) + points;
 
             // If this vote completes the round, do a full refresh so the resolved state takes over.
-            // Skipped when public voting is on — full timer must run out first.
+            // Skipped when public voting is on - full timer must run out first.
             if (!currentGroupData.publicVotingEnabled) {
                 const subs = currentGroupData.submissions;
                 const allComplete = currentGroupData.members.every(member => {
@@ -997,7 +1007,7 @@
                 }
             }
 
-            // Otherwise: targeted DOM updates only — keeps every other iframe alive.
+            // Otherwise: targeted DOM updates only - keeps every other iframe alive.
             const voteEl = document.querySelector(`[data-vote-target="${CSS.escape(targetUser)}"]`);
             if (voteEl) {
                 const replacement = document.createElement('p');
@@ -1010,7 +1020,7 @@
                 return;
             }
 
-            // If this was the user's first vote, they're now safe — update status text.
+            // If this was the user's first vote, they're now safe - update status text.
             const statusEl = document.getElementById('survival-status');
             if (statusEl && statusEl.innerText.includes('MUST VOTE')) {
                 statusEl.innerText = "✅ YOU ARE SAFE FROM THE KICK.";
@@ -1194,7 +1204,7 @@
         });
 
         // ============================================================
-        // CATEGORY PICKER — admin selects which pool reroll draws from
+        // CATEGORY PICKER - admin selects which pool reroll draws from
         // ============================================================
         document.getElementById('btn-pick-category').addEventListener('click', () => {
             openCategoryOverlay();
@@ -1246,7 +1256,7 @@
                 closeCategoryOverlay();
                 return;
             }
-            // Persist the choice. Doesn't change the *current* challenge — only future rerolls.
+            // Persist the choice. Doesn't change the *current* challenge - only future rerolls.
             await updateDoc(doc(db, "groups", currentGroupId), {
                 currentCategoryId: categoryId
             });
@@ -1297,7 +1307,7 @@
         }
 
         // ============================================================
-        // PUBLIC VOTE FLOW — anonymous voting via shareable link
+        // PUBLIC VOTE FLOW - anonymous voting via shareable link
         // ============================================================
 
         window.loadPublicVotePage = async function(groupId) {
@@ -1330,8 +1340,8 @@
         }
 
         function renderPublicVoteHeader() {
-            document.getElementById('pv-group-name').innerText = publicVoteGroupData.name || "—";
-            document.getElementById('pv-challenge-text').innerText = '"' + (publicVoteGroupData.currentChallenge || "—") + '"';
+            document.getElementById('pv-group-name').innerText = publicVoteGroupData.name || "-";
+            document.getElementById('pv-challenge-text').innerText = '"' + (publicVoteGroupData.currentChallenge || "-") + '"';
         }
 
         function renderPublicVoteSubmissions() {
@@ -1412,7 +1422,7 @@
             }
 
             // Write the vote AND bump leaderboard atomically.
-            // Anonymous voter ID is the key — name/identity never stored.
+            // Anonymous voter ID is the key - name/identity never stored.
             try {
                 await updateDoc(doc(db, "groups", publicVoteGroupId), {
                     [`submissions.${targetUser}.publicVotes.${voterId}`]: points,
@@ -1422,7 +1432,7 @@
                 return alert("Vote failed: " + e.message);
             }
 
-            // Bump cumulative global XP (same as member voting — public votes count too).
+            // Bump cumulative global XP (same as member voting - public votes count too).
             try {
                 await updateDoc(doc(db, "users", targetUser.toLowerCase()), {
                     totalXp: increment(points)
@@ -1439,7 +1449,7 @@
 
             renderPublicVoteSubmissions();
 
-            // Show join CTA after first vote — we want them on the platform.
+            // Show join CTA after first vote - we want them on the platform.
             document.getElementById('pv-join-cta').style.display = 'block';
             document.getElementById('pv-join-cta').scrollIntoView({behavior: 'smooth', block: 'center'});
         }
@@ -1454,7 +1464,7 @@
             const displayEl = document.getElementById('pv-time-remaining');
 
             if ((publicVoteGroupData.challengeStatus || 'pending') !== 'active' || !publicVoteGroupData.challengeStartTime) {
-                displayEl.innerText = "—";
+                displayEl.innerText = "-";
                 return;
             }
 
@@ -1488,7 +1498,7 @@
         }
 
         // ============================================================
-        // GLOBAL STATS — total XP + rank text on welcome screen.
+        // GLOBAL STATS - total XP + rank text on welcome screen.
         // Leaderboard list is lazy: only fetched when overlay opens.
         // ============================================================
         async function loadGlobalStats() {
@@ -1499,7 +1509,7 @@
             const userTotal = (userData && userData.totalXp) || 0;
             xpEl.innerText = userTotal.toLocaleString();
 
-            // No rank for users with 0 XP — would be misleading.
+            // No rank for users with 0 XP - would be misleading.
             if (userTotal <= 0) {
                 rankDisplayEl.style.display = 'none';
                 return;
@@ -1507,14 +1517,14 @@
 
             try {
                 // Cheap rank: count of users with strictly more XP, +1.
-                // Single aggregation query — no document reads.
+                // Single aggregation query - no document reads.
                 const higherQuery = query(collection(db, "users"), where("totalXp", ">", userTotal));
                 const countSnap = await getCountFromServer(higherQuery);
                 const userRank = countSnap.data().count + 1;
 
                 rankNumEl.innerText = userRank.toLocaleString();
                 rankDisplayEl.style.display = 'none';
-                // Animate in after a beat for emphasis — like the XP "lands" first, then rank.
+                // Animate in after a beat for emphasis - like the XP "lands" first, then rank.
                 setTimeout(() => {
                     rankDisplayEl.style.display = 'block';
                     const txt = rankDisplayEl.querySelector('.rank-text');
@@ -1546,7 +1556,7 @@
                     topUsers.push({ name: data.name || d.id, totalXp: data.totalXp || 0 });
                 });
 
-                // User's rank — needed only if they're outside top 10.
+                // User's rank - needed only if they're outside top 10.
                 let userRank = null;
                 if (userTotal > 0) {
                     try {
@@ -1607,7 +1617,7 @@
         });
 
         // ============================================================
-        // SOUND — tiny synthesized blip on button clicks. No assets.
+        // SOUND - tiny synthesized blip on button clicks. No assets.
         // Toggleable, persisted in localStorage.
         // ============================================================
        // ============================================================
@@ -1796,11 +1806,8 @@
 
         updateSoundIcon();
     </script>
-                <!-- Generatif arka plan scriptini buraya ekliyoruz -->
-    <script src="generative-bg.js"></script>
-                <!-- Zafer Efekti ve Chime Scripti -->
-   <!-- Zafer Efekti, Chime ve Özet Pop-up Scripti -->
-    <script>
+                <script src="generative-bg.js"></script>
+                <script>
     (function() {
         let fireworksFired = false;
 
