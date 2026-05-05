@@ -1621,54 +1621,61 @@
             btn.title = soundEnabled ? 'Sounds ON — click to mute' : 'Sounds OFF — click to enable';
         }
 
-        function playClick() {
+       function playClick() {
             if (!soundEnabled) return;
             try {
-                // Lazy-init AudioContext on first interaction (browser autoplay policy).
                 if (!audioContext) {
                     audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 }
                 const now = audioContext.currentTime;
-                const duration = 0.09;
+                
+                // Reverb (Yankı) hissi yaratmak için mikro delay ağı
+                const delay = audioContext.createDelay();
+                delay.delayTime.value = 0.025; // 25ms oda yankısı
+                const feedback = audioContext.createGain();
+                feedback.gain.value = 0.25; // Yankının sönümlenme miktarı
+                delay.connect(feedback);
+                feedback.connect(delay);
+                delay.connect(audioContext.destination);
 
-                // Layer 1: bright square sweep — top-end "click" energy.
-                // Pitch drops from 1400 → 700 Hz for that satisfying "thup" feel.
-                const osc1 = audioContext.createOscillator();
-                const gain1 = audioContext.createGain();
-                osc1.type = 'square';
-                osc1.frequency.setValueAtTime(1400, now);
-                osc1.frequency.exponentialRampToValueAtTime(700, now + duration);
-                gain1.gain.setValueAtTime(0, now);
-                gain1.gain.linearRampToValueAtTime(0.07, now + 0.004); // fast attack
-                gain1.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-                osc1.connect(gain1).connect(audioContext.destination);
-                osc1.start(now); osc1.stop(now + duration);
+                // 1. Butonun "Tok" gövdesi (Yumuşak Sine dalgası)
+                const oscBody = audioContext.createOscillator();
+                const gainBody = audioContext.createGain();
+                oscBody.type = 'sine';
+                // Frekans 600Hz'den 100Hz'e hızla düşerek tokluk hissi verir
+                oscBody.frequency.setValueAtTime(600, now);
+                oscBody.frequency.exponentialRampToValueAtTime(100, now + 0.05);
+                
+                gainBody.gain.setValueAtTime(0, now);
+                gainBody.gain.linearRampToValueAtTime(0.4, now + 0.002);
+                gainBody.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+                
+                oscBody.connect(gainBody);
+                gainBody.connect(audioContext.destination); // Sesi doğrudan ver
+                gainBody.connect(delay); // Aynı zamanda reverb ağına gönder
 
-                // Layer 2: sine sub-tone — body/warmth, kick-style sweep 440 → 180 Hz.
-                const osc2 = audioContext.createOscillator();
-                const gain2 = audioContext.createGain();
-                osc2.type = 'sine';
-                osc2.frequency.setValueAtTime(440, now);
-                osc2.frequency.exponentialRampToValueAtTime(180, now + duration);
-                gain2.gain.setValueAtTime(0, now);
-                gain2.gain.linearRampToValueAtTime(0.09, now + 0.006);
-                gain2.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-                osc2.connect(gain2).connect(audioContext.destination);
-                osc2.start(now); osc2.stop(now + duration);
+                // 2. Butonun "Çıtır" tıklama hissi (Kısa Triangle dalgası)
+                const oscClick = audioContext.createOscillator();
+                const gainClick = audioContext.createGain();
+                oscClick.type = 'triangle';
+                // Yüksek frekanstan orta frekansa çok ani düşüş (Click/Pluck)
+                oscClick.frequency.setValueAtTime(3000, now);
+                oscClick.frequency.exponentialRampToValueAtTime(500, now + 0.02);
+                
+                gainClick.gain.setValueAtTime(0, now);
+                gainClick.gain.linearRampToValueAtTime(0.15, now + 0.001);
+                gainClick.gain.exponentialRampToValueAtTime(0.001, now + 0.02);
+                
+                oscClick.connect(gainClick);
+                gainClick.connect(audioContext.destination);
+                gainClick.connect(delay);
 
-                // Layer 3: tiny detuned partial — adds chiptune sparkle without harshness.
-                const osc3 = audioContext.createOscillator();
-                const gain3 = audioContext.createGain();
-                osc3.type = 'triangle';
-                osc3.frequency.setValueAtTime(2100, now);
-                osc3.frequency.exponentialRampToValueAtTime(1050, now + duration * 0.6);
-                gain3.gain.setValueAtTime(0, now);
-                gain3.gain.linearRampToValueAtTime(0.025, now + 0.003);
-                gain3.gain.exponentialRampToValueAtTime(0.0001, now + duration * 0.5);
-                osc3.connect(gain3).connect(audioContext.destination);
-                osc3.start(now); osc3.stop(now + duration);
+                // Düğümleri başlat ve bitir
+                oscBody.start(now); oscBody.stop(now + 0.06);
+                oscClick.start(now); oscClick.stop(now + 0.03);
+                
             } catch (e) {
-                // AudioContext can fail in some embedded contexts — silent fail is fine.
+                // AudioContext hatalarını sessizce yoksay
             }
         }
 
