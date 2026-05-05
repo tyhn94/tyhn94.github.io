@@ -1627,54 +1627,62 @@
                 if (!audioContext) {
                     audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 }
+                
+                // SESİN KAPANMA HATASININ ÇÖZÜMÜ BURASI:
+                // Tarayıcı motoru uykuya aldıysa, sesi çalmadan önce zorla uyandırıyoruz.
+                if (audioContext.state === 'suspended') {
+                    audioContext.resume();
+                }
+
                 const now = audioContext.currentTime;
                 
-                // Pitch için rastgele bir çarpan (0.85 ile 1.15 arası).
-                // Bu değer her tıklamada farklı bir "nota" hissi verecek.
-                const pitchVar = 0.85 + Math.random() * 0.3;
+                // Pitch varyasyonu hala aktif ama daha kontrollü (0.9 ile 1.1 arası)
+                const pitchVar = 0.9 + Math.random() * 0.2;
                 
+                // Reverb ağını çok kıstım ki o "tok" hissiyatın altı çamurlaşmasın
                 const delay = audioContext.createDelay();
-                delay.delayTime.value = 0.025; 
+                delay.delayTime.value = 0.015; 
                 const feedback = audioContext.createGain();
-                feedback.gain.value = 0.25; 
+                feedback.gain.value = 0.10; // Yankı çok hafif
                 delay.connect(feedback);
                 feedback.connect(delay);
                 delay.connect(audioContext.destination);
 
+                // 1. Gövde (Tok ve derin Punch)
                 const oscBody = audioContext.createOscillator();
                 const gainBody = audioContext.createGain();
                 oscBody.type = 'sine';
                 
-                // Frekansları pitchVar katsayısı ile çarpıyoruz
-                oscBody.frequency.setValueAtTime(600 * pitchVar, now);
-                oscBody.frequency.exponentialRampToValueAtTime(100 * pitchVar, now + 0.05);
+                // 250Hz'den 40Hz'e (sub-bass) çok hızlı bir dalış
+                oscBody.frequency.setValueAtTime(250 * pitchVar, now);
+                oscBody.frequency.exponentialRampToValueAtTime(40 * pitchVar, now + 0.04);
                 
                 gainBody.gain.setValueAtTime(0, now);
-                gainBody.gain.linearRampToValueAtTime(0.4, now + 0.002);
-                gainBody.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+                gainBody.gain.linearRampToValueAtTime(0.7, now + 0.001); // Çok sert atak
+                gainBody.gain.exponentialRampToValueAtTime(0.001, now + 0.04); // Hızlı sönümleme
                 
                 oscBody.connect(gainBody);
                 gainBody.connect(audioContext.destination); 
                 gainBody.connect(delay); 
 
+                // 2. Vuruşun Keskinliği (Transient)
                 const oscClick = audioContext.createOscillator();
                 const gainClick = audioContext.createGain();
-                oscClick.type = 'triangle';
+                oscClick.type = 'square'; // Square dalgası o mekanik ısırığı verir
                 
-                // Click frekanslarını da aynı pitchVar ile çarpıyoruz
-                oscClick.frequency.setValueAtTime(3000 * pitchVar, now);
-                oscClick.frequency.exponentialRampToValueAtTime(500 * pitchVar, now + 0.02);
+                // 800Hz'den 100Hz'e anlık bir şaklama efekti
+                oscClick.frequency.setValueAtTime(800 * pitchVar, now);
+                oscClick.frequency.exponentialRampToValueAtTime(100 * pitchVar, now + 0.015);
                 
                 gainClick.gain.setValueAtTime(0, now);
-                gainClick.gain.linearRampToValueAtTime(0.15, now + 0.001);
-                gainClick.gain.exponentialRampToValueAtTime(0.001, now + 0.02);
+                gainClick.gain.linearRampToValueAtTime(0.12, now + 0.001);
+                gainClick.gain.exponentialRampToValueAtTime(0.001, now + 0.015);
                 
                 oscClick.connect(gainClick);
                 gainClick.connect(audioContext.destination);
-                gainClick.connect(delay);
 
-                oscBody.start(now); oscBody.stop(now + 0.06);
-                oscClick.start(now); oscClick.stop(now + 0.03);
+                oscBody.start(now); oscBody.stop(now + 0.05);
+                oscClick.start(now); oscClick.stop(now + 0.02);
                 
             } catch (e) {
                 // AudioContext hatalarını sessizce yoksay
