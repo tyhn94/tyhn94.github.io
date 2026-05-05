@@ -1610,8 +1610,13 @@
         // SOUND — tiny synthesized blip on button clicks. No assets.
         // Toggleable, persisted in localStorage.
         // ============================================================
+       // ============================================================
+        // SOUND & GENERATIVE BGM
+        // ============================================================
         let audioContext = null;
         let soundEnabled = localStorage.getItem("daredrop_sound") !== "off";
+        let bgmMasterGain = null;
+        let bgmStarted = false;
 
         function updateSoundIcon() {
             const btn = document.getElementById('sound-toggle');
@@ -1621,56 +1626,47 @@
             btn.title = soundEnabled ? 'Sounds ON — click to mute' : 'Sounds OFF — click to enable';
         }
 
-       function playClick() {
+        function playClick() {
             if (!soundEnabled) return;
             try {
                 if (!audioContext) {
                     audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 }
                 
-                // SESİN KAPANMA HATASININ ÇÖZÜMÜ BURASI:
-                // Tarayıcı motoru uykuya aldıysa, sesi çalmadan önce zorla uyandırıyoruz.
                 if (audioContext.state === 'suspended') {
                     audioContext.resume();
                 }
 
                 const now = audioContext.currentTime;
-                
-                // Pitch varyasyonu hala aktif ama daha kontrollü (0.9 ile 1.1 arası)
                 const pitchVar = 0.9 + Math.random() * 0.2;
                 
-                // Reverb ağını çok kıstım ki o "tok" hissiyatın altı çamurlaşmasın
                 const delay = audioContext.createDelay();
                 delay.delayTime.value = 0.015; 
                 const feedback = audioContext.createGain();
-                feedback.gain.value = 0.10; // Yankı çok hafif
+                feedback.gain.value = 0.10; 
                 delay.connect(feedback);
                 feedback.connect(delay);
                 delay.connect(audioContext.destination);
 
-                // 1. Gövde (Tok ve derin Punch)
                 const oscBody = audioContext.createOscillator();
                 const gainBody = audioContext.createGain();
                 oscBody.type = 'sine';
                 
-                // 250Hz'den 40Hz'e (sub-bass) çok hızlı bir dalış
                 oscBody.frequency.setValueAtTime(250 * pitchVar, now);
                 oscBody.frequency.exponentialRampToValueAtTime(40 * pitchVar, now + 0.04);
                 
                 gainBody.gain.setValueAtTime(0, now);
-                gainBody.gain.linearRampToValueAtTime(0.7, now + 0.001); // Çok sert atak
-                gainBody.gain.exponentialRampToValueAtTime(0.001, now + 0.04); // Hızlı sönümleme
+                gainBody.gain.linearRampToValueAtTime(0.7, now + 0.001); 
+                gainBody.gain.exponentialRampToValueAtTime(0.001, now + 0.04); 
                 
                 oscBody.connect(gainBody);
                 gainBody.connect(audioContext.destination); 
                 gainBody.connect(delay); 
 
-                // 2. Vuruşun Keskinliği (Transient)
                 const oscClick = audioContext.createOscillator();
                 const gainClick = audioContext.createGain();
-                oscClick.type = 'square'; // Square dalgası o mekanik ısırığı verir
+                oscClick.type = 'square'; 
                 
-                // 800Hz'den 100Hz'e anlık bir şaklama efekti
                 oscClick.frequency.setValueAtTime(800 * pitchVar, now);
                 oscClick.frequency.exponentialRampToValueAtTime(100 * pitchVar, now + 0.015);
                 
@@ -1684,29 +1680,128 @@
                 oscBody.start(now); oscBody.stop(now + 0.05);
                 oscClick.start(now); oscClick.stop(now + 0.02);
                 
-            } catch (e) {
-                // AudioContext hatalarını sessizce yoksay
-            }
+            } catch (e) {}
         }
+
+        // --- JENERATİF MÜZİK MOTORU ---
+        function initGenerativeMusic() {
+            if (bgmStarted) return;
+            bgmStarted = true;
+
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+
+            if (audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+
+            bgmMasterGain = audioContext.createGain();
+            bgmMasterGain.gain.value = soundEnabled ? 0.15 : 0; 
+            bgmMasterGain.connect(audioContext.destination);
+
+            // Retro PS1 ambiyansı için Delay ve Filter (boğuk ve derin)
+            const delay = audioContext.createDelay();
+            delay.delayTime.value = 0.45; 
+            const feedback = audioContext.createGain();
+            feedback.gain.value = 0.5;
+            
+            const lowpass = audioContext.createBiquadFilter();
+            lowpass.type = 'lowpass';
+            lowpass.frequency.value = 800; // VHS tarzı boğukluk
+
+            delay.connect(feedback);
+            feedback.connect(delay);
+            delay.connect(lowpass);
+            lowpass.connect(bgmMasterGain);
+
+            // Pentatonik dizi ile stokastik nota havuzu
+            const scale = [130.81, 155.56, 174.61, 196.00, 233.08, 261.63, 311.13];
+            let nextNoteTime = audioContext.currentTime + 0.1;
+
+            function schedule() {
+                // Sekme arka plandaysa döngüyü sürdür ama notaları yığma
+                if (audioContext.state === 'suspended') {
+                    requestAnimationFrame(schedule);
+                    return;
+                }
+
+                // Geri dönüldüğünde zamanlama sapmasını önle
+                if (nextNoteTime < audioContext.currentTime) {
+                    nextNoteTime = audioContext.currentTime + 0.1;
+                }
+
+                while (nextNoteTime < audioContext.currentTime + 0.15) {
+                    playStochasticNote(nextNoteTime);
+                    // Ritimde kontrollü kaos: farklı uzunlukta bekleme süreleri
+                    const step = Math.random() > 0.6 ? 0.25 : 0.5; 
+                    nextNoteTime += step;
+                }
+                requestAnimationFrame(schedule);
+            }
+
+            function playStochasticNote(time) {
+                // %70 es geçme (sessizlik), %30 çalma ihtimali ile minimalist bir yapı
+                if (Math.random() > 0.3) return;
+
+                const osc = audioContext.createOscillator();
+                const noteGain = audioContext.createGain();
+                
+                const freq = scale[Math.floor(Math.random() * scale.length)];
+                
+                // Analog hissi için hafif akort kayması
+                osc.detune.value = (Math.random() - 0.5) * 15; 
+                osc.type = Math.random() > 0.5 ? 'sine' : 'triangle';
+                osc.frequency.setValueAtTime(freq, time);
+
+                noteGain.gain.setValueAtTime(0, time);
+                noteGain.gain.linearRampToValueAtTime(0.08, time + 0.2); // Yavaş atak
+                noteGain.gain.exponentialRampToValueAtTime(0.001, time + 1.5); // Uzun kuyruk
+
+                osc.connect(noteGain);
+                noteGain.connect(bgmMasterGain); 
+                noteGain.connect(delay); 
+
+                osc.start(time);
+                osc.stop(time + 1.6);
+            }
+
+            schedule();
+        }
+
         window.toggleSound = function() {
             soundEnabled = !soundEnabled;
             localStorage.setItem("daredrop_sound", soundEnabled ? "on" : "off");
             updateSoundIcon();
-            // Audible confirmation when turning ON.
+            
+            // Müziği yumuşak bir fade in/out ile açıp kapat
+            if (bgmMasterGain) {
+                const now = audioContext ? audioContext.currentTime : 0;
+                bgmMasterGain.gain.cancelScheduledValues(now);
+                if (soundEnabled) {
+                    if (audioContext.state === 'suspended') audioContext.resume();
+                    bgmMasterGain.gain.linearRampToValueAtTime(0.15, now + 0.5);
+                } else {
+                    bgmMasterGain.gain.linearRampToValueAtTime(0, now + 0.5);
+                }
+            }
+            
             if (soundEnabled) playClick();
         }
 
-        // Global click listener — covers every interactive element (current + future).
-        // Selector matches all our button-ish things; new buttons get sound automatically.
+        // Global tıklama dinleyicisi
         document.addEventListener('click', (e) => {
+            // Kullanıcı sayfaya ilk kez dokunduğunda müziği başlat
+            if (!bgmStarted) {
+                initGenerativeMusic();
+            }
+
             if (e.target.closest('.btn, .kick-btn, .group-delete-btn, .category-card, .category-current-pill, #sound-toggle, button')) {
                 playClick();
             }
         });
 
-        // Set the icon state on initial load.
         updateSoundIcon();
-
     </script>
                 <!-- Generatif arka plan scriptini buraya ekliyoruz -->
     <script src="generative-bg.js"></script>
