@@ -1623,7 +1623,7 @@
             if (!btn) return;
             btn.innerText = soundEnabled ? '🔊' : '🔇';
             btn.classList.toggle('muted', !soundEnabled);
-            btn.title = soundEnabled ? 'Sounds ON — click to mute' : 'Sounds OFF — click to enable';
+            btn.title = soundEnabled ? 'Sounds ON (click to mute)' : 'Sounds OFF (click to enable)';
         }
 
         function playClick() {
@@ -1683,7 +1683,7 @@
             } catch (e) {}
         }
 
-        // --- JENERATİF MÜZİK MOTORU ---
+        // JENERATİF MÜZİK MOTORU
         function initGenerativeMusic() {
             if (bgmStarted) return;
             bgmStarted = true;
@@ -1697,10 +1697,10 @@
             }
 
             bgmMasterGain = audioContext.createGain();
-            bgmMasterGain.gain.value = soundEnabled ? 0.15 : 0; 
+            // Eski değer 0.15 idi, 0.35 yaparak sesi belirgin şekilde artırdık
+            bgmMasterGain.gain.value = soundEnabled ? 0.35 : 0; 
             bgmMasterGain.connect(audioContext.destination);
 
-            // Retro PS1 ambiyansı için Delay ve Filter (boğuk ve derin)
             const delay = audioContext.createDelay();
             delay.delayTime.value = 0.45; 
             const feedback = audioContext.createGain();
@@ -1708,32 +1708,28 @@
             
             const lowpass = audioContext.createBiquadFilter();
             lowpass.type = 'lowpass';
-            lowpass.frequency.value = 800; // VHS tarzı boğukluk
+            lowpass.frequency.value = 800; 
 
             delay.connect(feedback);
             feedback.connect(delay);
             delay.connect(lowpass);
             lowpass.connect(bgmMasterGain);
 
-            // Pentatonik dizi ile stokastik nota havuzu
             const scale = [130.81, 155.56, 174.61, 196.00, 233.08, 261.63, 311.13];
             let nextNoteTime = audioContext.currentTime + 0.1;
 
             function schedule() {
-                // Sekme arka plandaysa döngüyü sürdür ama notaları yığma
                 if (audioContext.state === 'suspended') {
                     requestAnimationFrame(schedule);
                     return;
                 }
 
-                // Geri dönüldüğünde zamanlama sapmasını önle
                 if (nextNoteTime < audioContext.currentTime) {
                     nextNoteTime = audioContext.currentTime + 0.1;
                 }
 
                 while (nextNoteTime < audioContext.currentTime + 0.15) {
                     playStochasticNote(nextNoteTime);
-                    // Ritimde kontrollü kaos: farklı uzunlukta bekleme süreleri
                     const step = Math.random() > 0.6 ? 0.25 : 0.5; 
                     nextNoteTime += step;
                 }
@@ -1741,7 +1737,6 @@
             }
 
             function playStochasticNote(time) {
-                // %70 es geçme (sessizlik), %30 çalma ihtimali ile minimalist bir yapı
                 if (Math.random() > 0.3) return;
 
                 const osc = audioContext.createOscillator();
@@ -1749,14 +1744,14 @@
                 
                 const freq = scale[Math.floor(Math.random() * scale.length)];
                 
-                // Analog hissi için hafif akort kayması
                 osc.detune.value = (Math.random() - 0.5) * 15; 
                 osc.type = Math.random() > 0.5 ? 'sine' : 'triangle';
                 osc.frequency.setValueAtTime(freq, time);
 
                 noteGain.gain.setValueAtTime(0, time);
-                noteGain.gain.linearRampToValueAtTime(0.08, time + 0.2); // Yavaş atak
-                noteGain.gain.exponentialRampToValueAtTime(0.001, time + 1.5); // Uzun kuyruk
+                // Eski değer 0.08 idi, 0.18 yaparak her notanın kendi vuruşunu güçlendirdik
+                noteGain.gain.linearRampToValueAtTime(0.18, time + 0.2); 
+                noteGain.gain.exponentialRampToValueAtTime(0.001, time + 1.5); 
 
                 osc.connect(noteGain);
                 noteGain.connect(bgmMasterGain); 
@@ -1774,13 +1769,13 @@
             localStorage.setItem("daredrop_sound", soundEnabled ? "on" : "off");
             updateSoundIcon();
             
-            // Müziği yumuşak bir fade in/out ile açıp kapat
             if (bgmMasterGain) {
                 const now = audioContext ? audioContext.currentTime : 0;
                 bgmMasterGain.gain.cancelScheduledValues(now);
                 if (soundEnabled) {
                     if (audioContext.state === 'suspended') audioContext.resume();
-                    bgmMasterGain.gain.linearRampToValueAtTime(0.15, now + 0.5);
+                    // Fade in hedefi 0.35 olarak güncellendi
+                    bgmMasterGain.gain.linearRampToValueAtTime(0.35, now + 0.5);
                 } else {
                     bgmMasterGain.gain.linearRampToValueAtTime(0, now + 0.5);
                 }
@@ -1789,9 +1784,7 @@
             if (soundEnabled) playClick();
         }
 
-        // Global tıklama dinleyicisi
         document.addEventListener('click', (e) => {
-            // Kullanıcı sayfaya ilk kez dokunduğunda müziği başlat
             if (!bgmStarted) {
                 initGenerativeMusic();
             }
