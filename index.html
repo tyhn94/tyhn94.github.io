@@ -438,7 +438,6 @@
         window.showScreen = function(screenId) {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
             document.getElementById(screenId).classList.add('active');
-            localStorage.setItem("daredrop_last_screen", screenId); // SON EKRANI KAYDEDER
         }
 
         onAuthStateChanged(auth, async (user) => {
@@ -482,18 +481,8 @@
                 await joinExistingGroup(inviteGroupId);
                 window.history.replaceState(null, "", window.location.pathname);
             } else {
-                // KAYDEDILEN EKRANI VE GRUBU OKUMA ISLEMI
-                const lastScreen = localStorage.getItem("daredrop_last_screen");
-                const lastGroup = localStorage.getItem("daredrop_last_group");
-
-                if (lastGroup && (lastScreen === 'screen-dashboard' || lastScreen === 'screen-history')) {
-                    await openDashboard(lastGroup);
-                    if (lastScreen === 'screen-history') {
-                        window.showHistory();
-                    }
-                } else {
-                    window.renderMyGroups();
-                }
+                window.renderMyGroups();
+            }
         }
 
         document.getElementById('btn-login').addEventListener('click', async () => {
@@ -677,7 +666,6 @@
 
         async function openDashboard(groupId) {
             currentGroupId = groupId;
-            localStorage.setItem("daredrop_last_group", groupId); // SON GRUBU KAYDEDER
             document.getElementById('member-list-ui').innerHTML = "<li>Loading...</li>";
             showScreen('screen-dashboard');
             
@@ -970,7 +958,7 @@
             // Link doğrulaması: Sadece YouTube, TikTok veya Instagram embedleri geçerlidir
             const embedHtml = getEmbedHtml(linkInput);
             if (!embedHtml) {
-            return alert("Invalid link! Please enter only a YouTube, TikTok, or Instagram link.");
+                return alert("Geçersiz link! Lütfen sadece YouTube, TikTok veya Instagram linki giriniz.");
             }
             
             const groupRef = doc(db, "groups", currentGroupId);
