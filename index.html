@@ -1,1814 +1,1844 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <link rel="manifest" href="manifest.json">
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DareDrop - MVP (Admin Menu Edition)</title>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;700&display=swap');
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DareDrop - MVP (Admin Menu Edition)</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;700&display=swap');
 
-        :root {
-            --bg-color: #0d0d0d;
-            --text-main: #33ff00;
-            --text-accent: #ff0055;
-            --border-color: #33ff00;
-            --admin-color: #ffaa00;
-            --timer-color: #00e5ff;
-            --crt-glow: 0 0 8px rgba(51, 255, 0, 0.6);
-        }
-        * { box-sizing: border-box; }
-        body {
-            background-color: var(--bg-color); color: var(--text-main);
-            font-family: 'Google Sans Code', monospace;
-            margin: 0; padding: 20px; display: flex; justify-content: center;
-            align-items: center; min-height: 100vh; text-shadow: var(--crt-glow);
-            overflow-x: hidden;
-        }
-        body::after {
-            content: " "; display: block; position: fixed; top: 0; left: 0; bottom: 0; right: 0;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
-            z-index: 2; background-size: 100% 2px, 3px 100%; pointer-events: none;
-        }
-        .container {
-            width: 100%; max-width: 450px; background: #111; border: 2px solid var(--border-color);
-            padding: 20px; position: relative; z-index: 10; box-shadow: 0 0 15px rgba(51, 255, 0, 0.2);
-            max-height: 95vh; overflow-y: auto;
-        }
-        .screen { display: none; }
-        .screen.active { display: block; animation: fadeIn 0.3s ease-in; }
-        h1, h2 { text-align: center; text-transform: uppercase; border-bottom: 1px dashed var(--text-main); padding-bottom: 10px; }
-        
-        .title-glitch { color: var(--text-main); letter-spacing: 2px; text-shadow: none; }
-        
-        .btn {
-            display: block; width: 100%; background: transparent; color: var(--text-main);
-            border: 1px solid var(--text-main); padding: 12px; margin: 10px 0;
-            font-family: inherit; font-size: 16px; font-weight: bold; cursor: pointer;
-            text-transform: uppercase; transition: all 0.2s;
-        }
-        .btn:hover:not(:disabled) { background: var(--text-main); color: var(--bg-color); }
-        .btn-accent { border-color: var(--text-accent); color: var(--text-accent); }
-        .btn-accent:hover:not(:disabled) { background: var(--text-accent); color: var(--bg-color); }
-        .btn-admin { border-color: var(--admin-color); color: var(--admin-color); }
-        .btn-admin:hover:not(:disabled) { background: var(--admin-color); color: var(--bg-color); }
-        .btn:disabled { border-color: #555 !important; color: #555 !important; cursor: not-allowed; background: transparent !important; }
-        
-        input[type="text"], input[type="number"] {
-            width: 100%; padding: 10px; background: #000; border: 1px solid var(--text-main);
-            color: var(--text-main); font-family: inherit; margin-bottom: 15px; outline: none;
-        }
-        .card { border: 1px solid #444; padding: 15px; margin: 15px 0; background: #0a0a0a; }
-        .code-display { font-size: 24px; text-align: center; color: var(--text-accent); letter-spacing: 4px; margin: 20px 0; padding: 10px; border: 1px dashed var(--text-accent); background: #220011; }
-        
-        .member-list { list-style: none; padding: 0; margin: 0; }
-        .member-list li { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px dashed #333; font-size: 14px; }
-        .kick-btn { background: transparent; border: 1px solid var(--text-accent); color: var(--text-accent); cursor: pointer; font-family: inherit; font-size: 12px; padding: 3px 8px; }
-        .kick-btn:hover { background: var(--text-accent); color: var(--bg-color); }
-        
-        .status { text-align: center; font-size: 14px; margin-top: 20px; color: #888; }
-        
-        /* NEW STYLES FOR MY GROUPS MENU */
-        .group-list-item { display: flex; gap: 10px; margin: 10px 0; width: 100%; }
-        .group-list-btn { flex: 1; text-align: left; padding-left: 20px; margin: 0 !important; }
-        .group-delete-btn { background: transparent; border: 1px solid #ff0000; color: #ff0000; cursor: pointer; font-family: inherit; font-size: 16px; padding: 0 15px; font-weight: bold; transition: all 0.2s; }
-        .group-delete-btn:hover { background: #ff0000; color: var(--bg-color); }
-        
-        .timer-display { font-size: 20px; text-align: center; font-weight: bold; margin: 10px 0; color: var(--timer-color); letter-spacing: 2px;}
+:root {
+--bg-color: #0d0d0d;
+--text-main: #33ff00;
+--text-accent: #ff0055;
+--border-color: #33ff00;
+--admin-color: #ffaa00;
+--timer-color: #00e5ff;
+--crt-glow: 0 0 8px rgba(51, 255, 0, 0.6);
+}
+* { box-sizing: border-box; }
+body {
+background-color: var(--bg-color); color: var(--text-main);
+font-family: 'Google Sans Code', monospace;
+margin: 0; padding: 20px; display: flex; justify-content: center;
+align-items: center; min-height: 100vh; text-shadow: var(--crt-glow);
+overflow-x: hidden;
+}
+body::after {
+content: " "; display: block; position: fixed; top: 0; left: 0; bottom: 0; right: 0;
+background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+z-index: 2; background-size: 100% 2px, 3px 100%; pointer-events: none;
+}
+.container {
+width: 100%; max-width: 450px; background: #111; border: 2px solid var(--border-color);
+padding: 20px; position: relative; z-index: 10; box-shadow: 0 0 15px rgba(51, 255, 0, 0.2);
+max-height: 95vh; overflow-y: auto;
+}
+.screen { display: none; }
+.screen.active { display: block; animation: fadeIn 0.3s ease-in; }
+h1, h2 { text-align: center; text-transform: uppercase; border-bottom: 1px dashed var(--text-main); padding-bottom: 10px; }
 
-        /* Mobile-friendly overlay (modal) */
-        .overlay-backdrop {
-            position: fixed; inset: 0; background: rgba(0, 0, 0, 0.85);
-            z-index: 100; display: none; align-items: center; justify-content: center;
-            padding: 20px; animation: fadeIn 0.2s;
-        }
-        .overlay-backdrop.active { display: flex; }
-        .overlay-sheet {
-            background: #111; border: 2px solid var(--border-color);
-            width: 100%; max-width: 420px; max-height: 85vh; overflow-y: auto;
-            padding: 20px; box-shadow: 0 0 30px rgba(51, 255, 0, 0.3);
-            animation: slideUp 0.25s ease-out;
-        }
-        .overlay-sheet h2 { margin-top: 0; }
-        .category-card {
-            border: 1px solid #444; padding: 14px; margin: 10px 0; cursor: pointer;
-            transition: all 0.15s; background: #0a0a0a; min-height: 44px;
-        }
-        .category-card:hover { border-color: var(--text-accent); background: #1a0008; }
-        .category-card.selected { border-color: var(--text-main); background: #001a00; box-shadow: 0 0 10px rgba(51, 255, 0, 0.2); }
-        .category-card .cat-header { display: flex; align-items: center; gap: 10px; font-weight: bold; font-size: 15px; }
-        .category-card .cat-emoji { font-size: 22px; }
-        .category-card .cat-desc { font-size: 12px; color: #888; margin-top: 6px; line-height: 1.4; }
-        .category-card .cat-count { font-size: 11px; color: #666; margin-top: 4px; }
-        .category-current-pill {
-            display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px;
-            border: 1px solid var(--admin-color); color: var(--admin-color);
-            font-size: 13px; cursor: pointer; background: transparent; font-family: inherit;
-            transition: all 0.15s;
-        }
-        .category-current-pill:hover { background: var(--admin-color); color: var(--bg-color); }
+.title-glitch { color: var(--text-main); letter-spacing: 2px; text-shadow: none; }
 
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes popIn {
-            0% { opacity: 0; transform: scale(0); }
-            60% { opacity: 1; transform: scale(1.25); }
-            100% { opacity: 1; transform: scale(1); }
-        }
+.btn {
+display: block; width: 100%; background: transparent; color: var(--text-main);
+border: 1px solid var(--text-main); padding: 12px; margin: 10px 0;
+font-family: inherit; font-size: 16px; font-weight: bold; cursor: pointer;
+text-transform: uppercase; transition: all 0.2s;
+}
+.btn:hover:not(:disabled) { background: var(--text-main); color: var(--bg-color); }
+.btn-accent { border-color: var(--text-accent); color: var(--text-accent); }
+.btn-accent:hover:not(:disabled) { background: var(--text-accent); color: var(--bg-color); }
+.btn-admin { border-color: var(--admin-color); color: var(--admin-color); }
+.btn-admin:hover:not(:disabled) { background: var(--admin-color); color: var(--bg-color); }
+.btn:disabled { border-color: #555 !important; color: #555 !important; cursor: not-allowed; background: transparent !important; }
 
-        /* Global stats — TOTAL XP + rank text */
-        .rank-text {
-            font-size: 14px; font-weight: bold;
-            color: #ffd700; text-shadow: 0 0 8px rgba(255, 215, 0, 0.5);
-            display: inline-block;
-            animation: popIn 0.5s ease-out;
-        }
-        .global-lb-row.is-me { background: #001a00 !important; padding: 8px !important; border-left: 2px solid var(--text-main); }
-        .global-lb-row .rank-num { color: var(--timer-color); font-weight: bold; margin-right: 8px; min-width: 28px; display: inline-block; }
+input[type="text"], input[type="number"] {
+width: 100%; padding: 10px; background: #000; border: 1px solid var(--text-main);
+color: var(--text-main); font-family: inherit; margin-bottom: 15px; outline: none;
+}
+.card { border: 1px solid #444; padding: 15px; margin: 15px 0; background: #0a0a0a; }
+.code-display { font-size: 24px; text-align: center; color: var(--text-accent); letter-spacing: 4px; margin: 20px 0; padding: 10px; border: 1px dashed var(--text-accent); background: #220011; }
 
-        /* Sound toggle — fixed top-right, persists across all screens */
-        #sound-toggle {
-            position: fixed; top: 12px; right: 12px; z-index: 50;
-            background: #111; border: 1px solid var(--text-main); color: var(--text-main);
-            width: 38px; height: 38px; cursor: pointer; font-size: 16px;
-            font-family: inherit; padding: 0; display: flex; align-items: center; justify-content: center;
-            transition: all 0.15s; box-shadow: 0 0 8px rgba(51, 255, 0, 0.2);
-        }
-        #sound-toggle:hover { background: var(--text-main); color: var(--bg-color); }
-        #sound-toggle.muted { border-color: #555; color: #555; box-shadow: none; }
-    </style>
+.member-list { list-style: none; padding: 0; margin: 0; }
+.member-list li { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px dashed #333; font-size: 14px; }
+.kick-btn { background: transparent; border: 1px solid var(--text-accent); color: var(--text-accent); cursor: pointer; font-family: inherit; font-size: 12px; padding: 3px 8px; }
+.kick-btn:hover { background: var(--text-accent); color: var(--bg-color); }
+
+.status { text-align: center; font-size: 14px; margin-top: 20px; color: #888; }
+
+/* NEW STYLES FOR MY GROUPS MENU */
+.group-list-item { display: flex; gap: 10px; margin: 10px 0; width: 100%; }
+.group-list-btn { flex: 1; text-align: left; padding-left: 20px; margin: 0 !important; }
+.group-delete-btn { background: transparent; border: 1px solid #ff0000; color: #ff0000; cursor: pointer; font-family: inherit; font-size: 16px; padding: 0 15px; font-weight: bold; transition: all 0.2s; }
+.group-delete-btn:hover { background: #ff0000; color: var(--bg-color); }
+
+.timer-display { font-size: 20px; text-align: center; font-weight: bold; margin: 10px 0; color: var(--timer-color); letter-spacing: 2px;}
+
+/* Mobile-friendly overlay (modal) */
+.overlay-backdrop {
+position: fixed; inset: 0; background: rgba(0, 0, 0, 0.85);
+z-index: 100; display: none; align-items: center; justify-content: center;
+padding: 20px; animation: fadeIn 0.2s;
+}
+.overlay-backdrop.active { display: flex; }
+.overlay-sheet {
+background: #111; border: 2px solid var(--border-color);
+width: 100%; max-width: 420px; max-height: 85vh; overflow-y: auto;
+padding: 20px; box-shadow: 0 0 30px rgba(51, 255, 0, 0.3);
+animation: slideUp 0.25s ease-out;
+}
+.overlay-sheet h2 { margin-top: 0; }
+.category-card {
+border: 1px solid #444; padding: 14px; margin: 10px 0; cursor: pointer;
+transition: all 0.15s; background: #0a0a0a; min-height: 44px;
+}
+.category-card:hover { border-color: var(--text-accent); background: #1a0008; }
+.category-card.selected { border-color: var(--text-main); background: #001a00; box-shadow: 0 0 10px rgba(51, 255, 0, 0.2); }
+.category-card .cat-header { display: flex; align-items: center; gap: 10px; font-weight: bold; font-size: 15px; }
+.category-card .cat-emoji { font-size: 22px; }
+.category-card .cat-desc { font-size: 12px; color: #888; margin-top: 6px; line-height: 1.4; }
+.category-card .cat-count { font-size: 11px; color: #666; margin-top: 4px; }
+.category-current-pill {
+display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px;
+border: 1px solid var(--admin-color); color: var(--admin-color);
+font-size: 13px; cursor: pointer; background: transparent; font-family: inherit;
+transition: all 0.15s;
+}
+.category-current-pill:hover { background: var(--admin-color); color: var(--bg-color); }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes popIn {
+0% { opacity: 0; transform: scale(0); }
+60% { opacity: 1; transform: scale(1.25); }
+100% { opacity: 1; transform: scale(1); }
+}
+
+/* Global stats — TOTAL XP + rank text */
+.rank-text {
+font-size: 14px; font-weight: bold;
+color: #ffd700; text-shadow: 0 0 8px rgba(255, 215, 0, 0.5);
+display: inline-block;
+animation: popIn 0.5s ease-out;
+}
+.global-lb-row.is-me { background: #001a00 !important; padding: 8px !important; border-left: 2px solid var(--text-main); }
+.global-lb-row .rank-num { color: var(--timer-color); font-weight: bold; margin-right: 8px; min-width: 28px; display: inline-block; }
+
+/* Sound toggle — fixed top-right, persists across all screens */
+#sound-toggle {
+position: fixed; top: 12px; right: 12px; z-index: 50;
+background: #111; border: 1px solid var(--text-main); color: var(--text-main);
+width: 38px; height: 38px; cursor: pointer; font-size: 16px;
+font-family: inherit; padding: 0; display: flex; align-items: center; justify-content: center;
+transition: all 0.15s; box-shadow: 0 0 8px rgba(51, 255, 0, 0.2);
+}
+#sound-toggle:hover { background: var(--text-main); color: var(--bg-color); }
+#sound-toggle.muted { border-color: #555; color: #555; box-shadow: none; }
+</style>
 </head>
 <body>
 
-    <button id="sound-toggle" onclick="window.toggleSound()" title="Toggle button sounds">🔊</button>
-
-    <div class="container">
-        
-        <div id="screen-loading" class="screen active">
-            <h1 class="title-glitch">DareDrop_</h1>
-            <p style="text-align:center;">Connecting...</p>
-        </div>
-
-        <div id="screen-login" class="screen">
-            <h1 class="title-glitch">DareDrop_</h1>
-            <p>> SYSTEM LOGIN.</p>
-            <div id="invite-alert" class="card" style="display: none; border-color: var(--text-accent);">
-                <p>> You've been invited to a group. Enter your name to join.</p>
-            </div>
-            <input type="text" id="username" placeholder="Enter your old username or make one up...">
-            <button class="btn" id="btn-login">Login / Register</button>
-        </div>
-
-        <div id="screen-my-groups" class="screen">
-            <h1 class="title-glitch">DareDrop_</h1>
-            <h2>WELCOME, <span id="display-username" style="color:var(--text-accent);"></span></h2>
-
-            <div class="card" id="user-stats-card" style="text-align: center; border-color: var(--text-accent);">
-                <p style="margin: 0 0 5px; font-size: 12px; color: #888;">> TOTAL XP EARNED</p>
-                <div style="font-size: 38px; color: var(--text-accent); font-weight: bold; line-height: 1;" id="user-total-xp">0</div>
-                <div id="rank-display" style="display: none; margin: 8px 0 0;">
-                    <span class="rank-text">#<span id="rank-popup-num">—</span> globally</span>
-                </div>
-                <p style="margin: 8px 0 0; font-size: 11px; color: #888;">Across all groups & rounds</p>
-            </div>
-
-            <button class="btn" id="btn-view-global-leaderboard" style="border-color: var(--timer-color); color: var(--timer-color);">View Global Leaderboard</button>
-
-            <div class="card">
-                <h3 style="margin-top:0; font-size:14px;">> MY GROUPS</h3>
-                <div id="group-list-container"></div>
-            </div>
-
-            <div class="card" style="border-color: #555;">
-                <h3 style="margin-top:0; font-size:14px; color:#aaa;">> CREATE NEW GROUP</h3>
-                <input type="text" id="new-group-name" placeholder="Group Name (e.g., Office Squad)...">
-                <button class="btn" id="btn-create-group" style="border-color: #aaa; color: #aaa;">Create</button>
-            </div>
-
-            <button class="btn" style="border-color: #555; color: #555; margin-top: 30px;" onclick="switchUser()">Switch User (Logout)</button>
-        </div>
-
-        <div id="screen-dashboard" class="screen">
-            <h2>GROUP: <span id="display-group"></span></h2>
-            
-            <div id="admin-panel" class="card" style="display: none; border-color: var(--admin-color);">
-                <h3 style="margin-top:0; font-size:14px; color:var(--admin-color);">> ADMIN PANEL</h3>
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                    <label style="font-size: 14px;">Max Member Capacity:</label>
-                    <input type="number" id="max-members-input" style="width: 80px; margin: 0; text-align: center;">
-                </div>
-                
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                    <label style="font-size: 14px;">Time Limit (Hrs/Mins):</label>
-                    <div style="display: flex; gap: 5px;">
-                        <input type="number" id="challenge-hours-input" placeholder="Hrs" style="width: 60px; margin: 0; text-align: center;" min="0">
-                        <input type="number" id="challenge-mins-input" placeholder="Mins" style="width: 60px; margin: 0; text-align: center;" min="0">
-                    </div>
-                </div>
-
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 10px;">
-                    <label style="font-size: 14px;">Challenge Category:</label>
-                    <button type="button" id="btn-pick-category" class="category-current-pill">
-                        <span id="current-category-emoji">🎲</span>
-                        <span id="current-category-name">Loading...</span>
-                        <span style="margin-left: 4px; opacity: 0.6;">▾</span>
-                    </button>
-                </div>
-
-                <label style="font-size: 14px; display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                    <input type="checkbox" id="admin-invite-checkbox" style="width: 18px; height: 18px;">
-                    Only Admin Can Invite
-                </label>
-                <label style="font-size: 14px; display: flex; align-items: center; gap: 10px; cursor: pointer; margin-top: 8px;">
-                    <input type="checkbox" id="public-voting-checkbox" style="width: 18px; height: 18px;">
-                    Enable Public Voting
-                </label>
-                <p style="font-size: 11px; color: #888; margin: 5px 0 0 28px;">Anyone with the public link can vote anonymously. Round won't end early — waits for full timer.</p>
-                <button class="btn btn-admin" id="btn-save-admin" style="padding: 8px; margin-top: 15px; font-size: 14px;">Save Settings</button>
-            </div>
-
-            <div id="invite-section" class="card" style="border-color: var(--text-accent); text-align: center;">
-                <p style="margin-top: 0; font-size: 14px;">> GATHER THE SQUAD</p>
-                <button class="btn btn-accent" id="btn-copy-invite">Copy Invite Link</button>
-            </div>
-
-            <div id="public-vote-status" class="card" style="display: none; border-color: #ff66cc; text-align: center;">
-                <p style="margin-top: 0; font-size: 14px; color: #ff66cc;">> PUBLIC VOTING <span id="pv-status-label">OFF</span></p>
-                <p id="pv-status-desc" style="font-size: 11px; color: #888; margin: 5px 0 10px;"></p>
-                <button class="btn" id="btn-copy-public-vote" style="border-color: #ff66cc; color: #ff66cc; display:none;">Copy Public Vote Link</button>
-            </div>
-
-            <div class="card">
-                <h3 style="margin-top:0; font-size:14px; display:flex; justify-content:space-between;">
-                    <span>> LEADERBOARD</span>
-                    <span style="color:#888;"><span id="current-count">0</span> / <span id="max-count">10</span></span>
-                </h3>
-                <ul id="member-list-ui" class="member-list"></ul>
-            </div>
-            
-            <div class="card" style="border-color: var(--timer-color);">
-                <h3 style="margin-top: 0; color: var(--timer-color);">> THE CHALLENGE</h3>
-                <p id="daily-challengeText">Loading...</p>
-                
-                <div style="border-top: 1px dashed var(--timer-color); margin-top: 15px; padding-top: 10px;">
-                    <p id="survival-status" style="margin:0; font-size: 14px; text-align: center; font-weight:bold;"></p>
-                    <div id="time-remaining-display" class="timer-display">--:--:--</div>
-                </div>
-
-                <div id="interaction-section" style="margin-top: 15px;">
-                    <!-- Dynamic Interactions render here -->
-                </div>
-            </div>
-
-            <button class="btn" style="border-color: var(--timer-color); color: var(--timer-color);" onclick="window.showHistory()">View Past Challenges</button>
-            
-            <button class="btn btn-admin" id="btn-reroll" style="display: none;">Reroll & Draft New Round</button>
-            <button class="btn" style="border-color: #555; color: #555;" onclick="renderMyGroups()">< Back to My Groups</button>
-        </div>
-
-        <div id="screen-public-vote" class="screen">
-            <h1 class="title-glitch">DareDrop_</h1>
-            <h2>PUBLIC VOTE: <span id="pv-group-name" style="color:var(--text-accent);"></span></h2>
-
-            <div class="card" style="border-color: var(--timer-color);">
-                <h3 style="margin-top: 0; color: var(--timer-color); font-size: 14px;">> THE CHALLENGE</h3>
-                <p id="pv-challenge-text" style="font-size: 14px;">Loading...</p>
-                <div style="border-top: 1px dashed var(--timer-color); margin-top: 10px; padding-top: 10px;">
-                    <p style="margin:0; font-size: 12px; text-align: center; color:#888;">Time remaining</p>
-                    <div id="pv-time-remaining" class="timer-display">--:--:--</div>
-                </div>
-            </div>
-
-            <div id="pv-status-banner" class="card" style="border-color: #ff66cc; text-align: center;">
-                <p style="margin: 0; font-size: 13px; color: #ff66cc;" id="pv-banner-text">> CAST YOUR VOTES BELOW (anonymous)</p>
-            </div>
-
-            <div id="pv-submissions-container"></div>
-
-            <div id="pv-join-cta" class="card" style="display:none; border-color: var(--text-main); text-align: center; background: #001a00;">
-                <h3 style="margin: 0 0 10px; color: var(--text-main); font-size: 14px;">> THANKS FOR VOTING!</h3>
-                <p style="font-size: 13px; margin: 5px 0;">Wanna run your own dares with your friends?</p>
-                <p style="font-size: 12px; color: #888; margin: 5px 0 15px;">Make a group, drop the chaos, kick the slackers.</p>
-                <button class="btn btn-accent" onclick="window.publicVoterJoinSite()">Join DareDrop</button>
-            </div>
-
-            <div class="status" style="margin-top: 20px;">You vote anonymously. One vote per submission per device.</div>
-        </div>
-
-        <div id="screen-history" class="screen">
-            <h1 class="title-glitch">DareDrop_</h1>
-            <h2>PAST CHALLENGES</h2>
-            
-            <div id="history-list-container" style="margin-bottom: 20px;"></div>
-
-            <button class="btn btn-accent" onclick="showScreen('screen-dashboard')">< Back to Dashboard</button>
-        </div>
-
-        <div class="status" id="system-status">Version: MVP v7.0 // Status: Enhanced Admin Menu</div>
-    </div>
-
-    <!-- Category picker overlay (mobile-friendly modal) -->
-    <div id="category-overlay" class="overlay-backdrop" onclick="if(event.target===this)closeCategoryOverlay()">
-        <div class="overlay-sheet">
-            <h2 style="font-size: 18px;">SELECT CATEGORY</h2>
-            <p style="font-size: 12px; color: #888; margin-top: -5px;">Reroll will draft only from this category.</p>
-            <div id="category-list-container"></div>
-            <button class="btn" style="margin-top: 15px; border-color: #555; color: #555;" onclick="closeCategoryOverlay()">Cancel</button>
-        </div>
-    </div>
-
-    <!-- Global leaderboard overlay -->
-    <div id="global-leaderboard-overlay" class="overlay-backdrop" onclick="if(event.target===this)closeGlobalLeaderboardOverlay()">
-        <div class="overlay-sheet">
-            <h2 style="font-size: 18px;">GLOBAL LEADERBOARD</h2>
-            <p style="font-size: 12px; color: #888; margin-top: -5px;">Top XP across the whole platform.</p>
-            <ul id="global-leaderboard-list" class="member-list">
-                <li style="color:#888; font-size:12px; justify-content:center;">Loading...</li>
-            </ul>
-            <button class="btn" style="margin-top: 15px; border-color: #555; color: #555;" onclick="closeGlobalLeaderboardOverlay()">Close</button>
-        </div>
-    </div>
-
-    <!-- Firebase SDKs -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-        import { getFirestore, collection, doc, setDoc, getDoc, updateDoc, arrayUnion, deleteDoc, increment, query, orderBy, limit, getDocs, where, getCountFromServer } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyD8H6gbz2MjLvGymm5TYtwffMPrJ1R4_qM",
-            authDomain: "daredrop-8b4dd.firebaseapp.com",
-            projectId: "daredrop-8b4dd",
-            storageBucket: "daredrop-8b4dd.firebasestorage.app",
-            messagingSenderId: "380587778608",
-            appId: "1:380587778608:web:5d8c7e1cc0d50837c5c3f5"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const auth = getAuth(app);
-
-        let currentUserName = localStorage.getItem("daredrop_username") || "";
-        let userData = null; 
-        let currentGroupId = null;
-        let currentGroupData = null;
-        let countdownTimer = null;
-        let publicVoteCountdownTimer = null;
-        let publicVoteGroupId = null;
-        let publicVoteGroupData = null;
-
-        const urlParams = new URLSearchParams(window.location.search);
-        const inviteGroupId = urlParams.get('groupId');
-        const publicVoteIdFromUrl = urlParams.get('publicVoteId');
-
-        // Anonymous public-voter ID — persisted per-device for abuse protection.
-        // One ID = one vote allowed per submission. Cleared with localStorage by user.
-        function getPublicVoterId() {
-            let pid = localStorage.getItem("daredrop_public_voter_id");
-            if (!pid) {
-                pid = "pv_" + Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
-                localStorage.setItem("daredrop_public_voter_id", pid);
-            }
-            return pid;
-        }
-
-        // Fallback data — used if challenges.json fails to load (network, parse, etc.)
-        // Keep this small but functional. The "real" data lives in challenges.json.
-        const FALLBACK_CHALLENGE_DATA = {
-            version: 0,
-            categories: [
-                {
-                    id: "mild",
-                    name: "Mild",
-                    emoji: "🌶️",
-                    description: "Easy social antics. Low risk, high charm.",
-                    challenges: [
-                        "Compliment someone in the friend group unexpectedly but genuinely. Share it in your story with one sentence.",
-                        "Promote the most boring thing you ate today as if it were a Michelin-starred meal."
-                    ]
-                },
-                {
-                    id: "spicy",
-                    name: "Spicy",
-                    emoji: "🔥",
-                    description: "A little drama, a little cringe.",
-                    challenges: [
-                        "Strike your most dramatic pose with the lowest effort possible and share it.",
-                        "Voice over your current view as if you're shooting a documentary and share it.",
-                        "Hum your favorite song for 5 seconds without making any facial expressions and share it."
-                    ]
-                }
-            ]
-        };
-
-        let challengeData = FALLBACK_CHALLENGE_DATA;
-        let challengeDataLoaded = false;
-
-        // Load challenges from sibling JSON file. Same-origin → no CORS issues.
-        // Cache-busting via ?v=... is optional; HTTP cache works fine for most cases.
-        async function loadChallengeData() {
-            try {
-                const res = await fetch('./challenges.json', { cache: 'default' });
-                if (!res.ok) throw new Error('HTTP ' + res.status);
-                const data = await res.json();
-                if (!data.categories || !Array.isArray(data.categories) || data.categories.length === 0) {
-                    throw new Error('Invalid shape: missing categories array');
-                }
-                challengeData = data;
-                challengeDataLoaded = true;
-                console.log(`[challenges.json] loaded v${data.version || '?'} with ${data.categories.length} categories`);
-            } catch (e) {
-                console.warn("[challenges.json] failed, using fallback:", e.message);
-                challengeData = FALLBACK_CHALLENGE_DATA;
-                challengeDataLoaded = false;
-            }
-        }
-
-        function getCategoryById(id) {
-            if (!id) return challengeData.categories[0];
-            return challengeData.categories.find(c => c.id === id) || challengeData.categories[0];
-        }
-
-        function getRandomChallengeFromCategory(categoryId) {
-            const cat = getCategoryById(categoryId);
-            if (!cat || !cat.challenges || cat.challenges.length === 0) {
-                return "No challenges available in this category.";
-            }
-            return cat.challenges[Math.floor(Math.random() * cat.challenges.length)];
-        }
-
-        // Kick off the load immediately — auth + UI may already wait for it implicitly.
-        loadChallengeData();
-
-        window.showScreen = function(screenId) {
-            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-            document.getElementById(screenId).classList.add('active');
-        }
-
-        onAuthStateChanged(auth, async (user) => {
-            if (user) {
-                // Public-vote links bypass login completely — anyone can vote anonymously.
-                if (publicVoteIdFromUrl) {
-                    await loadPublicVotePage(publicVoteIdFromUrl);
-                    return;
-                }
-                if (currentUserName) {
-                    await loadUserProfile(currentUserName);
-                } else {
-                    showScreen('screen-login');
-                    if(inviteGroupId) document.getElementById('invite-alert').style.display = 'block';
-                }
-            } else {
-                signInAnonymously(auth).catch((e) => console.error(e));
-            }
-        });
-
-        // PWA üzerinden gelen paylaşımları işleyen yeni fonksiyon
-        async function processSharedLink(username) {
-            const urlParams = new URLSearchParams(window.location.search);
-            // Telefonlar bazen linki 'text' bazen de 'share_url' içine koyar
-            let sharedLink = urlParams.get('share_url') || urlParams.get('text');
-
-            if (!sharedLink) return false;
-
-            // Instagram/TikTok bazen "Şu videoya bak: https://..." şeklinde metin yollar.
-            // Sadece link kısmını ayıklamak için Regex kullanıyoruz.
-            const urlMatch = sharedLink.match(/(https?:\/\/[^\s]+)/);
-            if (urlMatch) {
-                sharedLink = urlMatch[0];
-            } else {
-                return false;
-            }
-
-            // Kullanıcının gruplarını tara
-            for (let i = 0; i < userData.groups.length; i++) {
-                const groupId = userData.groups[i].id;
-                const groupSnap = await getDoc(doc(db, "groups", groupId));
-                
-                if (groupSnap.exists()) {
-                    const gData = groupSnap.data();
-                    const status = gData.challengeStatus || 'active';
-                    const subs = gData.submissions || {};
-
-                    // Grup aktifse ve bu kullanıcı henüz link GÖNDERMEDİYSE
-                    if (status === 'active' && !subs[username]) {
-                        
-                        // Linki direkt veritabanına o grubun submission'ı olarak kaydet
-                        await updateDoc(doc(db, "groups", groupId), {
-                            [`submissions.${username}`]: { link: sharedLink, votes: {} }
-                        });
-
-                        // URL'yi temizle (kullanıcı sayfayı yenilerse tekrar göndermesin diye)
-                        window.history.replaceState(null, "", window.location.pathname);
-
-                        // Kullanıcıyı doğrudan o grubun içine fırlat
-                        openDashboard(groupId);
-                        return true; 
-                    }
-                }
-            }
-            return false; 
-        }
-
-        // Güncellenmiş loadUserProfile fonksiyonu
-        async function loadUserProfile(username) {
-            currentUserName = username;
-            localStorage.setItem("daredrop_username", username);
-
-            const userRefId = username.toLowerCase();
-            const userDoc = await getDoc(doc(db, "users", userRefId));
-            
-            if (userDoc.exists()) {
-                userData = userDoc.data();
-                if (userData.totalXp === undefined) {
-                    userData.totalXp = 0;
-                    await updateDoc(doc(db, "users", userRefId), { totalXp: 0 });
-                }
-            } else {
-                userData = { name: username, groups: [], totalXp: 0 };
-                await setDoc(doc(db, "users", userRefId), userData);
-            }
-
-            // Önce paylaşım linki var mı ona bakıyoruz
-            const handledShare = await processSharedLink(username);
-            
-            // Eğer paylaşım linki yoksa veya işlenemediyse normal akışa devam et
-            if (!handledShare) {
-                if (inviteGroupId) {
-                    await joinExistingGroup(inviteGroupId);
-                    window.history.replaceState(null, "", window.location.pathname);
-                } else {
-                    window.renderMyGroups();
-                }
-            }
-        }
-        // MUHTEMELEN SİLİNEN BUTON GÖREVİ BURASI
-        document.getElementById('btn-login').addEventListener('click', async () => {
-            const username = document.getElementById('username').value.trim();
-            if (!username) return alert("You must provide a name.");
-            
-            document.getElementById('btn-login').innerText = "Loading...";
-            await loadUserProfile(username);
-            document.getElementById('btn-login').innerText = "Login / Register";
-        });
-        
-        document.getElementById('btn-create-group').addEventListener('click', async () => {
-            const groupName = document.getElementById('new-group-name').value.trim();
-            if(!groupName) return;
-
-            document.getElementById('btn-create-group').innerText = "...";
-            const newGroupId = Math.random().toString(36).substring(2, 8).toUpperCase();
-            
-            const defaultCategory = challengeData.categories[0];
-            const initialGroupData = {
-                name: groupName,
-                adminName: currentUserName,
-                maxMembers: 10,
-                adminOnlyInvites: false,
-                publicVotingEnabled: false,
-                challengeDurationHours: 24, 
-                challengeDurationMins: 0,
-                challengeStartTime: null, 
-                challengeStatus: 'pending', 
-                currentCategoryId: defaultCategory.id,
-                currentChallenge: defaultCategory.challenges[0] || "Make up your own dare.",
-                members: [currentUserName],
-                submissions: {}, 
-                leaderboard: { [currentUserName]: 0 },
-                challengeHistory: [], 
-                historyIndex: 0,      
-                createdAt: new Date()
-            };
-
-            await setDoc(doc(db, "groups", newGroupId), initialGroupData);
-
-            const groupInfo = { id: newGroupId, name: groupName };
-            const userRefId = currentUserName.toLowerCase();
-            await updateDoc(doc(db, "users", userRefId), {
-                groups: arrayUnion(groupInfo)
-            });
-
-            userData.groups.push(groupInfo);
-            document.getElementById('new-group-name').value = "";
-            document.getElementById('btn-create-group').innerText = "Create";
-            
-            openDashboard(newGroupId);
-        });
-
-        async function joinExistingGroup(groupId) {
-            try {
-                const groupRef = doc(db, "groups", groupId);
-                const docSnap = await getDoc(groupRef);
-                
-                if (docSnap.exists()) {
-                    const groupData = docSnap.data();
-                    const isAlreadyMember = groupData.members.includes(currentUserName);
-                    
-                    if (!isAlreadyMember) {
-                        if(groupData.members.length >= groupData.maxMembers) {
-                            alert("Sorry, this group has reached its maximum capacity.");
-                            window.renderMyGroups();
-                            return;
-                        }
-
-                        const currentLeaderboard = groupData.leaderboard || {};
-                        if (currentLeaderboard[currentUserName] === undefined) {
-                            currentLeaderboard[currentUserName] = 0;
-                        }
-
-                        await updateDoc(groupRef, { 
-                            members: arrayUnion(currentUserName),
-                            leaderboard: currentLeaderboard
-                        });
-                        
-                        const groupInfo = { id: groupId, name: groupData.name };
-                        const userRefId = currentUserName.toLowerCase();
-                        await updateDoc(doc(db, "users", userRefId), {
-                            groups: arrayUnion(groupInfo)
-                        });
-                        userData.groups.push(groupInfo);
-                    }
-                    openDashboard(groupId);
-                } else {
-                    // UPDATED ALERT MESSAGE
-                    alert("This group no longer exists or the invite link is invalid.");
-                    window.renderMyGroups();
-                }
-            } catch (e) {
-                alert("Error: " + e.message);
-                window.renderMyGroups();
-            }
-        }
-
-        async function openDashboard(groupId) {
-            currentGroupId = groupId;
-            document.getElementById('member-list-ui').innerHTML = "<li>Loading...</li>";
-            showScreen('screen-dashboard');
-            
-            await refreshGroupData();
-        }
-
-        async function refreshGroupData() {
-            const docSnap = await getDoc(doc(db, "groups", currentGroupId));
-            
-            if(!docSnap.exists()) {
-                alert("This group has been deleted.");
-                window.renderMyGroups();
-                return;
-            }
-
-            currentGroupData = docSnap.data();
-            
-            const amIStillMember = currentGroupData.members.includes(currentUserName);
-            if(!amIStillMember) {
-                alert("You failed to survive or were kicked from this group.");
-                window.renderMyGroups();
-                return;
-            }
-
-            const isAdmin = currentGroupData.adminName === currentUserName;
-            const submissions = currentGroupData.submissions || {};
-            const status = currentGroupData.challengeStatus || 'active'; 
-
-            // Auto-resolve early if every member has both submitted and voted.
-            // The check mirrors resolveChallengeAndKick's per-member logic.
-            // SKIPPED when public voting is enabled — round must wait for full timer
-            // so external voters get the entire window to weigh in.
-            if (status === 'active' && currentGroupData.members.length > 0 && !currentGroupData.publicVotingEnabled) {
-                const allComplete = currentGroupData.members.every(member => {
-                    if (!submissions[member]) return false;
-                    const others = Object.keys(submissions).filter(m => m !== member);
-                    if (others.length === 0) return true; // no one else submitted yet
-                    return others.some(o => submissions[o].votes && submissions[o].votes[member] !== undefined);
-                });
-                if (allComplete) {
-                    resolveChallengeAndKick(); // will trigger another refreshGroupData with status='resolved'
-                    return;
-                }
-            }
-
-            document.getElementById('display-group').innerText = currentGroupData.name;
-            document.getElementById('current-count').innerText = currentGroupData.members.length;
-            document.getElementById('max-count').innerText = currentGroupData.maxMembers;
-            
-            const activeChallenge = currentGroupData.currentChallenge || (challengeData.categories[0]?.challenges[0]) || "—";
-            document.getElementById('daily-challengeText').innerText = '"' + activeChallenge + '"';
-
-            document.getElementById('admin-panel').style.display = isAdmin ? 'block' : 'none';
-            document.getElementById('btn-reroll').style.display = isAdmin ? 'block' : 'none';
-            
-            if(isAdmin) {
-                document.getElementById('max-members-input').value = currentGroupData.maxMembers;
-                document.getElementById('challenge-hours-input').value = currentGroupData.challengeDurationHours !== undefined ? currentGroupData.challengeDurationHours : 24;
-                document.getElementById('challenge-mins-input').value = currentGroupData.challengeDurationMins || 0;
-                document.getElementById('admin-invite-checkbox').checked = currentGroupData.adminOnlyInvites;
-                document.getElementById('public-voting-checkbox').checked = !!currentGroupData.publicVotingEnabled;
-
-                // Update category pill display
-                const cat = getCategoryById(currentGroupData.currentCategoryId);
-                document.getElementById('current-category-emoji').innerText = cat.emoji || '🎲';
-                document.getElementById('current-category-name').innerText = cat.name || 'Default';
-            }
-
-            if(currentGroupData.adminOnlyInvites && !isAdmin) {
-                document.getElementById('invite-section').style.display = 'none';
-            } else {
-                document.getElementById('invite-section').style.display = 'block';
-            }
-
-            // Public voting status — visible to ALL members so they know the rules.
-            const pvCard = document.getElementById('public-vote-status');
-            const pvLabel = document.getElementById('pv-status-label');
-            const pvDesc = document.getElementById('pv-status-desc');
-            const pvCopyBtn = document.getElementById('btn-copy-public-vote');
-            pvCard.style.display = 'block';
-            if (currentGroupData.publicVotingEnabled) {
-                pvCard.style.borderColor = '#ff66cc';
-                pvLabel.innerText = 'ON';
-                pvLabel.style.color = '#ff66cc';
-                pvDesc.innerText = 'Outsiders can vote anonymously via the public link. Round runs the full timer.';
-                pvCopyBtn.style.display = 'block'; // ALL members can share — viral.
-            } else {
-                pvCard.style.borderColor = '#444';
-                pvLabel.innerText = 'OFF';
-                pvLabel.style.color = '#888';
-                pvDesc.innerText = isAdmin ? 'Toggle it on in the admin panel above to let outsiders vote.' : 'Only admin can enable this.';
-                pvCopyBtn.style.display = 'none';
-            }
-
-            const hasSubmitted = !!submissions[currentUserName];
-            const otherSubmissions = Object.keys(submissions).filter(m => m !== currentUserName);
-            let hasVoted = (otherSubmissions.length === 0); 
-            
-            if (!hasVoted) {
-                hasVoted = otherSubmissions.some(other => submissions[other].votes && submissions[other].votes[currentUserName] !== undefined);
-            }
-            
-            const isSafe = hasSubmitted && hasVoted;
-            const statusEl = document.getElementById('survival-status');
-            const interactionDiv = document.getElementById('interaction-section');
-            interactionDiv.innerHTML = "";
-
-            if (status === 'pending') {
-                statusEl.innerText = "WAITING FOR ADMIN TO START.";
-                statusEl.style.color = "var(--admin-color)";
-                document.getElementById('time-remaining-display').innerText = "00:00:00";
-                
-                if (isAdmin) {
-                    interactionDiv.innerHTML = `<button class="btn btn-admin" style="font-size: 18px; padding: 15px;" onclick="startChallengeNow()">START CHALLENGE</button>`;
-                }
-            } else if (status === 'resolved') {
-                statusEl.innerText = "ROUND OVER! Waiting for admin to draft new round.";
-                statusEl.style.color = "#888";
-            } else {
-                if (isSafe) {
-                    statusEl.innerText = "✅ YOU ARE SAFE FROM THE KICK.";
-                    statusEl.style.color = "var(--text-main)";
-                } else if (!hasSubmitted) {
-                    statusEl.innerText = "❌ SUBMIT A LINK TO SURVIVE!";
-                    statusEl.style.color = "var(--text-accent)";
-                } else {
-                    statusEl.innerText = "❌ YOU MUST VOTE TO SURVIVE!";
-                    statusEl.style.color = "var(--text-accent)";
-                }
-
-                if (!hasSubmitted) {
-                    interactionDiv.innerHTML = `
-                        <input type="text" id="proof-link-input" placeholder="Paste your story/post link here...">
-                        <button class="btn btn-accent" onclick="submitProof()">Submit Proof</button>
-                    `;
-                } else {
-                    // Show submitter their own proof first
-                    const mySub = submissions[currentUserName];
-                    const myEmbedHtml = getEmbedHtml(mySub.link);
-                    const myProofDisplay = myEmbedHtml
-                        ? `${myEmbedHtml}<p style="font-size:11px; color:#888; margin:5px 0 0; text-align:right;"><a href="${mySub.link}" target="_blank" style="color:#888;">↗ Open original</a></p>`
-                        : `<p style="margin:5px 0; font-size:12px; color:#ff9900; padding:8px; border:1px dashed #555;">⚠️ This link can't be embedded. <a href="${mySub.link}" target="_blank" style="color:var(--timer-color);">Click to open</a></p>`;
-                    let votingHtml = `<h4 style='color:var(--timer-color); margin-bottom:5px;'>> YOUR PROOF</h4>
-                        <div style="border:1px solid var(--timer-color); padding:10px; margin-bottom:15px;">
-                            ${myProofDisplay}
-                        </div>`;
-                    votingHtml += "<h4 style='color:var(--text-main); margin-bottom:5px;'>> VOTE ON OTHERS</h4>";
-                    if (otherSubmissions.length === 0) {
-                        votingHtml += "<p style='font-size:12px; color:#888;'>No other submissions yet. You are safe!</p>";
-                    } else {
-                        otherSubmissions.forEach(other => {
-                            const sub = submissions[other];
-                            const myVote = sub.votes ? sub.votes[currentUserName] : null;
-                            const embedHtml = getEmbedHtml(sub.link);
-                            const proofDisplay = embedHtml
-                                ? `${embedHtml}<p style="font-size:11px; color:#888; margin:5px 0 0; text-align:right;"><a href="${sub.link}" target="_blank" style="color:#888;">↗ Open original</a></p>`
-                                : `<p style="margin:5px 0; font-size:12px; color:#ff9900; padding:8px; border:1px dashed #555;">⚠️ This link can't be embedded. <a href="${sub.link}" target="_blank" style="color:var(--timer-color);">Click to open</a></p>`;
-
-                            votingHtml += `<div style="border:1px solid #333; padding:10px; margin-bottom:10px;">
-                                <p style="margin-top:0; margin-bottom:8px; font-size:14px;"><strong>${other}</strong></p>
-                                ${proofDisplay}`;
-                            
-                            if (myVote !== null && myVote !== undefined) {
-                                votingHtml += `<p style="font-size:12px; color:var(--text-main); margin:0;">You awarded ${myVote} XP.</p>`;
-                            } else {
-                                votingHtml += `
-                                    <div data-vote-target="${other}" style="display:flex; gap:5px; flex-wrap: wrap;">
-                                        <button class="btn" style="padding:5px; margin:0; font-size:10px; flex:1;" onclick="castVote('${other}', 50)">Legendary (50)</button>
-                                        <button class="btn" style="padding:5px; margin:0; font-size:10px; flex:1;" onclick="castVote('${other}', 30)">Did it (30)</button>
-                                        <button class="btn" style="padding:5px; margin:0; font-size:10px; flex:1;" onclick="castVote('${other}', 10)">Weak (10)</button>
-                                        <button class="btn" style="padding:5px; margin:0; font-size:10px; flex:1; border-color:#ff0000; color:#ff0000;" onclick="castVote('${other}', 0)">Sus (0)</button>
-                                    </div>
-                                `;
-                            }
-                            votingHtml += `</div>`;
-                        });
-                    }
-                    interactionDiv.innerHTML = votingHtml;
-                }
-            }
-
-            renderLeaderboard();
-
-            if(status === 'active') {
-                startCountdown();
-            } else if (countdownTimer) {
-                clearInterval(countdownTimer);
-            }
-        }
-
-        window.startChallengeNow = async function() {
-            if(!confirm("Start the countdown for everyone now?")) return;
-            await updateDoc(doc(db, "groups", currentGroupId), {
-                challengeStatus: 'active',
-                challengeStartTime: Date.now()
-            });
-            refreshGroupData();
-        }
-
-        function renderLeaderboard() {
-            if (!currentGroupData || !currentGroupData.members) return;
-            const lb = currentGroupData.leaderboard || {};
-            const status = currentGroupData.challengeStatus || 'active';
-            const isAdmin = currentGroupData.adminName === currentUserName;
-            const listUI = document.getElementById('member-list-ui');
-            listUI.innerHTML = "";
-
-            const sortedMembers = currentGroupData.members.slice().sort((a, b) => (lb[b] || 0) - (lb[a] || 0));
-
-            sortedMembers.forEach((memberName, idx) => {
-                const li = document.createElement('li');
-                let nameHtml = `${memberName} - <strong>${lb[memberName] || 0} XP</strong>`;
-
-                if (memberName === currentGroupData.adminName) {
-                    nameHtml += " <span style='color:var(--admin-color); font-size:10px;'>(ADMIN)</span>";
-                }
-                if (memberName === currentUserName) {
-                    nameHtml += " <span style='color:#888; font-size:10px;'>(YOU)</span>";
-                }
-
-                let actionHtml = "";
-                if (isAdmin && memberName !== currentUserName && status !== 'resolved') {
-                    actionHtml = `<button class="kick-btn" onclick="kickMember('${memberName}')">Kick</button>`;
-                }
-
-                if (status === 'resolved') {
-                    const rankPrefix = `<span style="color:var(--timer-color); font-weight:bold; margin-right:6px;">#${idx + 1}</span>`;
-                    const sub = (currentGroupData.submissions || {})[memberName];
-                    let proofBlock = "";
-                    if (sub && sub.link) {
-                        const embedHtml = getEmbedHtml(sub.link);
-                        proofBlock = embedHtml
-                            ? `<div style="margin-top:8px;">${embedHtml}<p style="font-size:11px; color:#888; margin:5px 0 0; text-align:right;"><a href="${sub.link}" target="_blank" style="color:#888;">↗ Open original</a></p></div>`
-                            : `<p style="margin:8px 0 0; font-size:12px; color:#ff9900; padding:8px; border:1px dashed #555;">⚠️ This link can't be embedded. <a href="${sub.link}" target="_blank" style="color:var(--timer-color);">Click to open</a></p>`;
-                    } else {
-                        proofBlock = `<p style="margin:8px 0 0; font-size:11px; color:#666; font-style:italic;">No submission</p>`;
-                    }
-                    li.style.flexDirection = 'column';
-                    li.style.alignItems = 'stretch';
-                    li.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center; width:100%;"><span>${rankPrefix}${nameHtml}</span> ${actionHtml}</div>${proofBlock}`;
-                } else {
-                    li.innerHTML = `<span>${nameHtml}</span> ${actionHtml}`;
-                }
-                listUI.appendChild(li);
-            });
-        }
-
-        // Detect Instagram (post/reel) and TikTok URLs and return an iframe embed.
-        // Returns null for unsupported URLs so caller can show a fallback.
-        function getEmbedHtml(url) {
-            if (!url || typeof url !== 'string') return null;
-
-            // Instagram post or reel: instagram.com/p/SHORTCODE or instagram.com/reel/SHORTCODE
-            const igMatch = url.match(/instagram\.com\/(p|reel)\/([A-Za-z0-9_-]+)/);
-            if (igMatch) {
-                const type = igMatch[1];
-                const id = igMatch[2];
-                return `<iframe src="https://www.instagram.com/${type}/${id}/embed/" 
-                            width="100%" height="540" frameborder="0" scrolling="no" allowtransparency="true"
-                            loading="lazy"
-                            style="border:1px solid #333; background:#000; max-width:500px; display:block;"></iframe>`;
-            }
-
-            // TikTok video with numeric ID: tiktok.com/@user/video/1234567890
-            const ttMatch = url.match(/tiktok\.com\/@[^/]+\/video\/(\d+)/);
-            if (ttMatch) {
-                const id = ttMatch[1];
-                return `<iframe src="https://www.tiktok.com/embed/v2/${id}" 
-                            width="100%" height="600" frameborder="0" scrolling="no" 
-                            allow="encrypted-media;" loading="lazy"
-                            style="border:1px solid #333; background:#000; max-width:325px; display:block;"></iframe>`;
-            }
-
-            // Unsupported (vm.tiktok.com short links, screenshots, private accounts, other platforms)
-            return null;
-        }
-
-        window.submitProof = async function() {
-            const linkInput = document.getElementById('proof-link-input').value.trim();
-            if (!linkInput) return alert("Please paste a link to your post/story.");
-            
-            const groupRef = doc(db, "groups", currentGroupId);
-            await updateDoc(groupRef, {
-                [`submissions.${currentUserName}`]: { link: linkInput, votes: {} }
-            });
-            refreshGroupData();
-        }
-
-        window.castVote = async function(targetUser, points) {
-            const groupRef = doc(db, "groups", currentGroupId);
-            await updateDoc(groupRef, {
-                [`submissions.${targetUser}.votes.${currentUserName}`]: points,
-                [`leaderboard.${targetUser}`]: increment(points)
-            });
-
-            // Cumulative global XP — survives rerolls (group leaderboard resets, this doesn't).
-            try {
-                await updateDoc(doc(db, "users", targetUser.toLowerCase()), {
-                    totalXp: increment(points)
-                });
-            } catch (e) {
-                console.warn("Couldn't bump global totalXp for", targetUser, e.message);
-            }
-
-            // Optimistic local-state update so subsequent renders & checks see the new vote.
-            if (!currentGroupData.submissions) currentGroupData.submissions = {};
-            if (!currentGroupData.submissions[targetUser]) currentGroupData.submissions[targetUser] = { votes: {} };
-            if (!currentGroupData.submissions[targetUser].votes) currentGroupData.submissions[targetUser].votes = {};
-            currentGroupData.submissions[targetUser].votes[currentUserName] = points;
-            if (!currentGroupData.leaderboard) currentGroupData.leaderboard = {};
-            currentGroupData.leaderboard[targetUser] = (currentGroupData.leaderboard[targetUser] || 0) + points;
-
-            // If this vote completes the round, do a full refresh so the resolved state takes over.
-            // Skipped when public voting is on — full timer must run out first.
-            if (!currentGroupData.publicVotingEnabled) {
-                const subs = currentGroupData.submissions;
-                const allComplete = currentGroupData.members.every(member => {
-                    if (!subs[member]) return false;
-                    const others = Object.keys(subs).filter(m => m !== member);
-                    if (others.length === 0) return true;
-                    return others.some(o => subs[o].votes && subs[o].votes[member] !== undefined);
-                });
-                if (allComplete) {
-                    return refreshGroupData();
-                }
-            }
-
-            // Otherwise: targeted DOM updates only — keeps every other iframe alive.
-            const voteEl = document.querySelector(`[data-vote-target="${CSS.escape(targetUser)}"]`);
-            if (voteEl) {
-                const replacement = document.createElement('p');
-                replacement.style.cssText = "font-size:12px; color:var(--text-main); margin:0;";
-                replacement.textContent = `You awarded ${points} XP.`;
-                voteEl.replaceWith(replacement);
-            } else {
-                // Fallback if the element disappeared somehow
-                refreshGroupData();
-                return;
-            }
-
-            // If this was the user's first vote, they're now safe — update status text.
-            const statusEl = document.getElementById('survival-status');
-            if (statusEl && statusEl.innerText.includes('MUST VOTE')) {
-                statusEl.innerText = "✅ YOU ARE SAFE FROM THE KICK.";
-                statusEl.style.color = "var(--text-main)";
-            }
-
-            // Re-render leaderboard with new XP totals (no iframes during 'active' state, so cheap).
-            renderLeaderboard();
-        }
-
-        window.resolveChallengeAndKick = async function() {
-            const docRef = doc(db, "groups", currentGroupId);
-            const docSnap = await getDoc(docRef);
-            const data = docSnap.data();
-            
-            if (data.challengeStatus !== 'active') return; 
-
-            const submissions = data.submissions || {};
-            const survivingMembers = [];
-
-            data.members.forEach(member => {
-                const hasSubmitted = !!submissions[member];
-                const otherSubmissions = Object.keys(submissions).filter(m => m !== member);
-                let hasVoted = (otherSubmissions.length === 0);
-                
-                if (!hasVoted) {
-                    hasVoted = otherSubmissions.some(other => submissions[other].votes && submissions[other].votes[member] !== undefined);
-                }
-
-                if (hasSubmitted && hasVoted) {
-                    survivingMembers.push(member);
-                }
-            });
-
-            await updateDoc(docRef, {
-                challengeStatus: 'resolved',
-                members: survivingMembers
-            });
-            
-            refreshGroupData();
-        }
-
-        function startCountdown() {
-            if (countdownTimer) clearInterval(countdownTimer);
-
-            const startTime = currentGroupData.challengeStartTime || Date.now();
-            const durationHours = currentGroupData.challengeDurationHours !== undefined ? currentGroupData.challengeDurationHours : 24;
-            const durationMins = currentGroupData.challengeDurationMins || 0;
-            
-            const totalMs = (durationHours * 60 * 60 * 1000) + (durationMins * 60 * 1000);
-            const deadline = startTime + totalMs;
-            
-            const displayEl = document.getElementById('time-remaining-display');
-
-            countdownTimer = setInterval(() => {
-                const now = Date.now();
-                const timeLeft = deadline - now;
-
-                if (timeLeft > 0) {
-                    const hoursLeft = Math.floor(timeLeft / (1000 * 60 * 60));
-                    const minutesLeft = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
-                    const secondsLeft = Math.floor((timeLeft % (1000 * 60)) / 1000);
-                    
-                    displayEl.innerText = `${String(hoursLeft).padStart(2,'0')}:${String(minutesLeft).padStart(2,'0')}:${String(secondsLeft).padStart(2,'0')}`;
-                    displayEl.style.color = "var(--timer-color)";
-                } else {
-                    displayEl.innerText = "TIME'S UP! RESOLVING...";
-                    displayEl.style.color = "var(--text-accent)";
-                    clearInterval(countdownTimer);
-                    
-                    if(currentGroupData.challengeStatus === 'active') {
-                        resolveChallengeAndKick();
-                    }
-                }
-            }, 1000);
-        }
-
-        document.getElementById('btn-save-admin').addEventListener('click', async () => {
-            const newMax = parseInt(document.getElementById('max-members-input').value) || 10;
-            let newHours = parseInt(document.getElementById('challenge-hours-input').value);
-            let newMins = parseInt(document.getElementById('challenge-mins-input').value);
-            const adminOnly = document.getElementById('admin-invite-checkbox').checked;
-            const publicVoting = document.getElementById('public-voting-checkbox').checked;
-
-            if (isNaN(newHours)) newHours = 0;
-            if (isNaN(newMins)) newMins = 0;
-            
-            if (newHours === 0 && newMins === 0) {
-                newHours = 24; 
-            }
-
-            if(newMax < currentGroupData.members.length) {
-                alert("Maximum member count cannot be less than the current member count. Kick some members first.");
-                return;
-            }
-
-            document.getElementById('btn-save-admin').innerText = "...";
-            await updateDoc(doc(db, "groups", currentGroupId), {
-                maxMembers: newMax,
-                challengeDurationHours: newHours,
-                challengeDurationMins: newMins,
-                adminOnlyInvites: adminOnly,
-                publicVotingEnabled: publicVoting
-            });
-            document.getElementById('btn-save-admin').innerText = "Save Settings";
-            refreshGroupData();
-        });
-
-        document.getElementById('btn-reroll').addEventListener('click', async () => {
-            if(currentGroupData.challengeStatus === 'active' && !confirm("The challenge is still active. Are you sure you want to reroll early?")) {
-                return;
-            }
-
-            document.getElementById('btn-reroll').innerText = "Drafting...";
-            
-            let history = currentGroupData.challengeHistory || [];
-            let hIndex = currentGroupData.historyIndex || 0;
-
-            if (currentGroupData.challengeStatus !== 'pending') {
-                const historyItem = {
-                    challenge: currentGroupData.currentChallenge,
-                    leaderboard: currentGroupData.leaderboard || {},
-                    timestamp: Date.now()
-                };
-
-                if (history.length < 5) {
-                    history.push(historyItem);
-                } else {
-                    history[hIndex] = historyItem;
-                }
-                hIndex = (hIndex + 1) % 5;
-            }
-
-            const newLeaderboard = {};
-            currentGroupData.members.forEach(m => newLeaderboard[m] = 0);
-
-            // Pull from the group's selected category. If somehow missing, fall back to first.
-            const activeCatId = currentGroupData.currentCategoryId || challengeData.categories[0].id;
-            const randomTask = getRandomChallengeFromCategory(activeCatId);
-            
-            await updateDoc(doc(db, "groups", currentGroupId), {
-                challengeHistory: history,
-                historyIndex: hIndex,
-                leaderboard: newLeaderboard,
-                currentChallenge: randomTask,
-                challengeStartTime: null, 
-                challengeStatus: 'pending', 
-                submissions: {} 
-            });
-            
-            document.getElementById('btn-reroll').innerText = "Reroll & Draft New Round";
-            refreshGroupData();
-        });
-
-        window.kickMember = async function(targetName) {
-            if (currentGroupData.challengeStatus === 'resolved') {
-                return alert("You cannot kick members after the round is over!");
-            }
-            if(!confirm(`Are you sure you want to kick ${targetName}?`)) return;
-            const updatedMembers = currentGroupData.members.filter(m => m !== targetName);
-            await updateDoc(doc(db, "groups", currentGroupId), {
-                members: updatedMembers
-            });
-            refreshGroupData();
-        }
-
-        document.getElementById('btn-copy-invite').addEventListener('click', () => {
-            const baseUrl = window.location.origin + window.location.pathname;
-            const inviteUrl = `${baseUrl}?groupId=${currentGroupId}`;
-            navigator.clipboard.writeText(inviteUrl).then(() => {
-                alert("Link copied!\nSend it to the group via WhatsApp: " + inviteUrl);
-            });
-        });
-
-        document.getElementById('btn-copy-public-vote').addEventListener('click', () => {
-            const baseUrl = window.location.origin + window.location.pathname;
-            const publicUrl = `${baseUrl}?publicVoteId=${currentGroupId}`;
-            navigator.clipboard.writeText(publicUrl).then(() => {
-                alert("Public vote link copied!\nAnyone with this link can vote anonymously:\n" + publicUrl);
-            });
-        });
-
-        // ============================================================
-        // CATEGORY PICKER — admin selects which pool reroll draws from
-        // ============================================================
-        document.getElementById('btn-pick-category').addEventListener('click', () => {
-            openCategoryOverlay();
-        });
-
-        window.openCategoryOverlay = function() {
-            const overlay = document.getElementById('category-overlay');
-            const list = document.getElementById('category-list-container');
-            list.innerHTML = "";
-
-            const currentId = currentGroupData?.currentCategoryId || challengeData.categories[0].id;
-
-            challengeData.categories.forEach(cat => {
-                const card = document.createElement('div');
-                card.className = "category-card" + (cat.id === currentId ? " selected" : "");
-                card.onclick = () => selectCategory(cat.id);
-
-                const count = (cat.challenges || []).length;
-                card.innerHTML = `
-                    <div class="cat-header">
-                        <span class="cat-emoji">${cat.emoji || '🎲'}</span>
-                        <span>${cat.name}</span>
-                        ${cat.id === currentId ? '<span style="margin-left:auto; color:var(--text-main); font-size:11px;">CURRENT</span>' : ''}
-                    </div>
-                    ${cat.description ? `<div class="cat-desc">${cat.description}</div>` : ''}
-                    <div class="cat-count">${count} challenge${count === 1 ? '' : 's'}</div>
-                `;
-                list.appendChild(card);
-            });
-
-            // Tiny note if user is on fallback data (network issue)
-            if (!challengeDataLoaded) {
-                const note = document.createElement('p');
-                note.style.cssText = "font-size:11px; color:#ff9900; margin-top:10px; text-align:center;";
-                note.innerText = "⚠️ Using fallback list. challenges.json didn't load.";
-                list.appendChild(note);
-            }
-
-            overlay.classList.add('active');
-        }
-
-        window.closeCategoryOverlay = function() {
-            document.getElementById('category-overlay').classList.remove('active');
-        }
-
-        window.selectCategory = async function(categoryId) {
-            if (!currentGroupId || !currentGroupData) return;
-            if (currentGroupData.currentCategoryId === categoryId) {
-                closeCategoryOverlay();
-                return;
-            }
-            // Persist the choice. Doesn't change the *current* challenge — only future rerolls.
-            await updateDoc(doc(db, "groups", currentGroupId), {
-                currentCategoryId: categoryId
-            });
-            closeCategoryOverlay();
-            refreshGroupData();
-        }
-
-        window.switchUser = function() {
-            if(confirm("Are you sure you want to switch users?")) {
-                localStorage.removeItem("daredrop_username");
-                location.reload(); 
-            }
-        }
-
-        window.showHistory = function() {
-            showScreen('screen-history');
-            const container = document.getElementById('history-list-container');
-            container.innerHTML = "";
-
-            const history = currentGroupData.challengeHistory || [];
-            if (history.length === 0) {
-                container.innerHTML = "<p style='color:#888; font-size:12px; text-align:center;'>No past challenges yet. Survive a round first!</p>";
-                return;
-            }
-
-            const sortedHistory = [...history].sort((a, b) => b.timestamp - a.timestamp);
-
-            sortedHistory.forEach((item, index) => {
-                let card = document.createElement('div');
-                card.className = "card";
-                card.style.borderColor = "var(--timer-color)";
-                
-                let dateStr = new Date(item.timestamp).toLocaleString();
-                
-                let lbHtml = "";
-                let players = Object.keys(item.leaderboard).sort((a, b) => item.leaderboard[b] - item.leaderboard[a]);
-                players.forEach(p => {
-                    lbHtml += `<li style="font-size:12px; display:flex; justify-content:space-between; border-bottom:1px dashed #333; padding:4px 0;"><span>${p}</span> <strong>${item.leaderboard[p]} XP</strong></li>`;
-                });
-
-                card.innerHTML = `
-                    <h4 style="margin:0 0 10px 0; color:var(--text-main); font-size:12px;">RECORD <span style="float:right; color:#888;">${dateStr}</span></h4>
-                    <p style="font-size:14px; margin-bottom:10px;">"${item.challenge}"</p>
-                    <ul style="list-style:none; padding:0; margin:0;">${lbHtml}</ul>
-                `;
-                container.appendChild(card);
-            });
-        }
-
-        // ============================================================
-        // PUBLIC VOTE FLOW — anonymous voting via shareable link
-        // ============================================================
-
-        window.loadPublicVotePage = async function(groupId) {
-            publicVoteGroupId = groupId;
-            showScreen('screen-public-vote');
-            
-            const container = document.getElementById('pv-submissions-container');
-            container.innerHTML = "<p style='color:#888; text-align:center; font-size:13px;'>Loading...</p>";
-
-            const docSnap = await getDoc(doc(db, "groups", groupId));
-            if (!docSnap.exists()) {
-                container.innerHTML = "<p style='color:var(--text-accent); text-align:center;'>This group no longer exists.</p>";
-                return;
-            }
-
-            publicVoteGroupData = docSnap.data();
-
-            // If admin disabled public voting, show a polite block.
-            if (!publicVoteGroupData.publicVotingEnabled) {
-                document.getElementById('pv-banner-text').innerText = "> PUBLIC VOTING IS NOT ENABLED FOR THIS GROUP";
-                document.getElementById('pv-status-banner').style.borderColor = '#888';
-                container.innerHTML = "<p style='color:#888; text-align:center; font-size:13px; padding:20px;'>The group admin hasn't turned on public voting. Ask them to enable it.</p>";
-                renderPublicVoteHeader();
-                return;
-            }
-
-            renderPublicVoteHeader();
-            renderPublicVoteSubmissions();
-            startPublicVoteCountdown();
-        }
-
-        function renderPublicVoteHeader() {
-            document.getElementById('pv-group-name').innerText = publicVoteGroupData.name || "—";
-            document.getElementById('pv-challenge-text').innerText = '"' + (publicVoteGroupData.currentChallenge || "—") + '"';
-        }
-
-        function renderPublicVoteSubmissions() {
-            const container = document.getElementById('pv-submissions-container');
-            container.innerHTML = "";
-
-            const status = publicVoteGroupData.challengeStatus || 'pending';
-            const submissions = publicVoteGroupData.submissions || {};
-            const submitterNames = Object.keys(submissions);
-
-            if (status === 'pending') {
-                container.innerHTML = "<p style='color:#888; text-align:center; font-size:13px; padding:20px;'>The round hasn't started yet. Check back soon.</p>";
-                return;
-            }
-            if (status === 'resolved') {
-                container.innerHTML = "<p style='color:#888; text-align:center; font-size:13px; padding:20px;'>This round is over. Voting is closed.</p>";
-                return;
-            }
-            if (submitterNames.length === 0) {
-                container.innerHTML = "<p style='color:#888; text-align:center; font-size:13px; padding:20px;'>No one has submitted proof yet. Check back soon.</p>";
-                return;
-            }
-
-            const myVoterId = getPublicVoterId();
-
-            submitterNames.forEach(name => {
-                const sub = submissions[name];
-                const publicVotes = sub.publicVotes || {};
-                const myExistingVote = publicVotes[myVoterId];
-                const embedHtml = getEmbedHtml(sub.link);
-                const proofDisplay = embedHtml
-                    ? `${embedHtml}<p style="font-size:11px; color:#888; margin:5px 0 0; text-align:right;"><a href="${sub.link}" target="_blank" style="color:#888;">↗ Open original</a></p>`
-                    : `<p style="margin:5px 0; font-size:12px; color:#ff9900; padding:8px; border:1px dashed #555;">⚠️ This link can't be embedded. <a href="${sub.link}" target="_blank" style="color:var(--timer-color);">Click to open</a></p>`;
-
-                const card = document.createElement('div');
-                card.className = "card";
-                card.style.borderColor = "#333";
-
-                let voteSection = "";
-                if (myExistingVote !== undefined) {
-                    voteSection = `<p style="font-size:12px; color:var(--text-main); margin:10px 0 0; text-align:center;">✓ You awarded ${myExistingVote} XP to ${name}.</p>`;
-                } else {
-                    voteSection = `
-                        <div data-pv-target="${name}" style="display:flex; gap:5px; flex-wrap: wrap; margin-top: 10px;">
-                            <button class="btn" style="padding:5px; margin:0; font-size:10px; flex:1;" onclick="castPublicVote('${name.replace(/'/g, "\\'")}', 50)">Legendary (50)</button>
-                            <button class="btn" style="padding:5px; margin:0; font-size:10px; flex:1;" onclick="castPublicVote('${name.replace(/'/g, "\\'")}', 30)">Did it (30)</button>
-                            <button class="btn" style="padding:5px; margin:0; font-size:10px; flex:1;" onclick="castPublicVote('${name.replace(/'/g, "\\'")}', 10)">Weak (10)</button>
-                            <button class="btn" style="padding:5px; margin:0; font-size:10px; flex:1; border-color:#ff0000; color:#ff0000;" onclick="castPublicVote('${name.replace(/'/g, "\\'")}', 0)">Sus (0)</button>
-                        </div>
-                    `;
-                }
-
-                card.innerHTML = `
-                    <p style="margin:0 0 10px; font-size:14px;"><strong>${name}</strong></p>
-                    ${proofDisplay}
-                    ${voteSection}
-                `;
-                container.appendChild(card);
-            });
-        }
-
-        window.castPublicVote = async function(targetUser, points) {
-            if (!publicVoteGroupData || !publicVoteGroupData.publicVotingEnabled) {
-                return alert("Public voting isn't enabled.");
-            }
-            if ((publicVoteGroupData.challengeStatus || 'pending') !== 'active') {
-                return alert("Voting isn't open right now.");
-            }
-
-            const voterId = getPublicVoterId();
-            const submissions = publicVoteGroupData.submissions || {};
-            const targetSub = submissions[targetUser];
-            if (!targetSub) return alert("That submission no longer exists.");
-
-            const existingVotes = targetSub.publicVotes || {};
-            if (existingVotes[voterId] !== undefined) {
-                return alert("You already voted on this submission. One vote per submission.");
-            }
-
-            // Write the vote AND bump leaderboard atomically.
-            // Anonymous voter ID is the key — name/identity never stored.
-            try {
-                await updateDoc(doc(db, "groups", publicVoteGroupId), {
-                    [`submissions.${targetUser}.publicVotes.${voterId}`]: points,
-                    [`leaderboard.${targetUser}`]: increment(points)
-                });
-            } catch (e) {
-                return alert("Vote failed: " + e.message);
-            }
-
-            // Bump cumulative global XP (same as member voting — public votes count too).
-            try {
-                await updateDoc(doc(db, "users", targetUser.toLowerCase()), {
-                    totalXp: increment(points)
-                });
-            } catch (e) {
-                console.warn("Couldn't bump global totalXp for", targetUser, e.message);
-            }
-
-            // Optimistic local update so re-render shows the cast vote.
-            if (!publicVoteGroupData.submissions[targetUser].publicVotes) {
-                publicVoteGroupData.submissions[targetUser].publicVotes = {};
-            }
-            publicVoteGroupData.submissions[targetUser].publicVotes[voterId] = points;
-
-            renderPublicVoteSubmissions();
-
-            // Show join CTA after first vote — we want them on the platform.
-            document.getElementById('pv-join-cta').style.display = 'block';
-            document.getElementById('pv-join-cta').scrollIntoView({behavior: 'smooth', block: 'center'});
-        }
-
-        window.publicVoterJoinSite = function() {
-            // Drop the publicVoteId param and go to the clean homepage so they can sign up.
-            window.location.href = window.location.origin + window.location.pathname;
-        }
-
-        function startPublicVoteCountdown() {
-            if (publicVoteCountdownTimer) clearInterval(publicVoteCountdownTimer);
-            const displayEl = document.getElementById('pv-time-remaining');
-
-            if ((publicVoteGroupData.challengeStatus || 'pending') !== 'active' || !publicVoteGroupData.challengeStartTime) {
-                displayEl.innerText = "—";
-                return;
-            }
-
-            const startTime = publicVoteGroupData.challengeStartTime;
-            const durationHours = publicVoteGroupData.challengeDurationHours !== undefined ? publicVoteGroupData.challengeDurationHours : 24;
-            const durationMins = publicVoteGroupData.challengeDurationMins || 0;
-            const totalMs = (durationHours * 60 * 60 * 1000) + (durationMins * 60 * 1000);
-            const deadline = startTime + totalMs;
-
-            publicVoteCountdownTimer = setInterval(() => {
-                const timeLeft = deadline - Date.now();
-                if (timeLeft > 0) {
-                    const h = Math.floor(timeLeft / (1000 * 60 * 60));
-                    const m = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
-                    const s = Math.floor((timeLeft % (1000 * 60)) / 1000);
-                    displayEl.innerText = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-                } else {
-                    displayEl.innerText = "TIME'S UP";
-                    displayEl.style.color = "var(--text-accent)";
-                    clearInterval(publicVoteCountdownTimer);
-                    // Refresh once so the "round over" message kicks in for the public viewer.
-                    setTimeout(async () => {
-                        const snap = await getDoc(doc(db, "groups", publicVoteGroupId));
-                        if (snap.exists()) {
-                            publicVoteGroupData = snap.data();
-                            renderPublicVoteSubmissions();
-                        }
-                    }, 2000);
-                }
-            }, 1000);
-        }
-
-        // ============================================================
-        // GLOBAL STATS — total XP + rank text on welcome screen.
-        // Leaderboard list is lazy: only fetched when overlay opens.
-        // ============================================================
-        async function loadGlobalStats() {
-            const xpEl = document.getElementById('user-total-xp');
-            const rankDisplayEl = document.getElementById('rank-display');
-            const rankNumEl = document.getElementById('rank-popup-num');
-
-            const userTotal = (userData && userData.totalXp) || 0;
-            xpEl.innerText = userTotal.toLocaleString();
-
-            // No rank for users with 0 XP — would be misleading.
-            if (userTotal <= 0) {
-                rankDisplayEl.style.display = 'none';
-                return;
-            }
-
-            try {
-                // Cheap rank: count of users with strictly more XP, +1.
-                // Single aggregation query — no document reads.
-                const higherQuery = query(collection(db, "users"), where("totalXp", ">", userTotal));
-                const countSnap = await getCountFromServer(higherQuery);
-                const userRank = countSnap.data().count + 1;
-
-                rankNumEl.innerText = userRank.toLocaleString();
-                rankDisplayEl.style.display = 'none';
-                // Animate in after a beat for emphasis — like the XP "lands" first, then rank.
-                setTimeout(() => {
-                    rankDisplayEl.style.display = 'block';
-                    const txt = rankDisplayEl.querySelector('.rank-text');
-                    if (txt) {
-                        txt.style.animation = 'none';
-                        void txt.offsetWidth; // force reflow
-                        txt.style.animation = 'popIn 0.5s ease-out';
-                    }
-                }, 500);
-            } catch (e) {
-                console.warn("Rank query failed:", e.message);
-                rankDisplayEl.style.display = 'none';
-            }
-        }
-
-        // Lazy-load leaderboard list on overlay open. Top 10 + user's row if outside it.
-        async function loadGlobalLeaderboardList() {
-            const listEl = document.getElementById('global-leaderboard-list');
-            listEl.innerHTML = "<li style='color:#888; font-size:12px; justify-content:center;'>Loading...</li>";
-
-            try {
-                const userTotal = (userData && userData.totalXp) || 0;
-
-                const topQuery = query(collection(db, "users"), orderBy("totalXp", "desc"), limit(10));
-                const topSnap = await getDocs(topQuery);
-                const topUsers = [];
-                topSnap.forEach(d => {
-                    const data = d.data();
-                    topUsers.push({ name: data.name || d.id, totalXp: data.totalXp || 0 });
-                });
-
-                // User's rank — needed only if they're outside top 10.
-                let userRank = null;
-                if (userTotal > 0) {
-                    try {
-                        const higherQuery = query(collection(db, "users"), where("totalXp", ">", userTotal));
-                        const countSnap = await getCountFromServer(higherQuery);
-                        userRank = countSnap.data().count + 1;
-                    } catch (e) {
-                        const idx = topUsers.findIndex(u => u.name.toLowerCase() === currentUserName.toLowerCase());
-                        if (idx >= 0) userRank = idx + 1;
-                    }
-                }
-
-                listEl.innerHTML = "";
-                if (topUsers.length === 0 || (topUsers[0].totalXp || 0) === 0) {
-                    listEl.innerHTML = "<li style='color:#888; font-size:12px; justify-content:center;'>No XP earned anywhere yet. Be the first.</li>";
-                    return;
-                }
-
-                let foundMe = false;
-                topUsers.forEach((u, idx) => {
-                    if ((u.totalXp || 0) === 0) return; // skip zero-XP entries
-                    const isMe = u.name.toLowerCase() === currentUserName.toLowerCase();
-                    if (isMe) foundMe = true;
-                    const li = document.createElement('li');
-                    if (isMe) li.className = "global-lb-row is-me";
-                    li.innerHTML = `<span><span class="rank-num">#${idx+1}</span>${u.name}${isMe ? ' <span style="color:#888; font-size:10px;">(YOU)</span>' : ''}</span> <strong>${(u.totalXp || 0).toLocaleString()} XP</strong>`;
-                    listEl.appendChild(li);
-                });
-
-                if (!foundMe && userRank && userTotal > 0) {
-                    const sep = document.createElement('li');
-                    sep.style.cssText = "color: #444; padding: 4px 0; justify-content: center; border-bottom: none;";
-                    sep.innerText = "···";
-                    listEl.appendChild(sep);
-
-                    const myLi = document.createElement('li');
-                    myLi.className = "global-lb-row is-me";
-                    myLi.innerHTML = `<span><span class="rank-num">#${userRank}</span>${currentUserName} <span style="color:#888; font-size:10px;">(YOU)</span></span> <strong>${userTotal.toLocaleString()} XP</strong>`;
-                    listEl.appendChild(myLi);
-                }
-            } catch (e) {
-                console.error("loadGlobalLeaderboardList failed:", e);
-                listEl.innerHTML = "<li style='color:#888; font-size:12px; justify-content:center;'>Couldn't load leaderboard.</li>";
-            }
-        }
-
-        window.openGlobalLeaderboardOverlay = async function() {
-            document.getElementById('global-leaderboard-overlay').classList.add('active');
-            await loadGlobalLeaderboardList();
-        }
-
-        window.closeGlobalLeaderboardOverlay = function() {
-            document.getElementById('global-leaderboard-overlay').classList.remove('active');
-        }
-
-        document.getElementById('btn-view-global-leaderboard').addEventListener('click', () => {
-            window.openGlobalLeaderboardOverlay();
-        });
-
-        // ============================================================
-        // SOUND — tiny synthesized blip on button clicks. No assets.
-        // Toggleable, persisted in localStorage.
-        // ============================================================
-       // ============================================================
-        // SOUND & GENERATIVE BGM
-        // ============================================================
-        let audioContext = null;
-        let soundEnabled = localStorage.getItem("daredrop_sound") !== "off";
-        let bgmMasterGain = null;
-        let bgmStarted = false;
-
-        function updateSoundIcon() {
-            const btn = document.getElementById('sound-toggle');
-            if (!btn) return;
-            btn.innerText = soundEnabled ? '🔊' : '🔇';
-            btn.classList.toggle('muted', !soundEnabled);
-            btn.title = soundEnabled ? 'Sounds ON (click to mute)' : 'Sounds OFF (click to enable)';
-        }
-
-        function playClick() {
-            if (!soundEnabled) return;
-            try {
-                if (!audioContext) {
-                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                }
-                
-                if (audioContext.state === 'suspended') {
-                    audioContext.resume();
-                }
-
-                const now = audioContext.currentTime;
-                const pitchVar = 0.9 + Math.random() * 0.2;
-                
-                const delay = audioContext.createDelay();
-                delay.delayTime.value = 0.015; 
-                const feedback = audioContext.createGain();
-                feedback.gain.value = 0.10; 
-                delay.connect(feedback);
-                feedback.connect(delay);
-                delay.connect(audioContext.destination);
-
-                const oscBody = audioContext.createOscillator();
-                const gainBody = audioContext.createGain();
-                oscBody.type = 'sine';
-                
-                oscBody.frequency.setValueAtTime(250 * pitchVar, now);
-                oscBody.frequency.exponentialRampToValueAtTime(40 * pitchVar, now + 0.04);
-                
-                gainBody.gain.setValueAtTime(0, now);
-                gainBody.gain.linearRampToValueAtTime(0.7, now + 0.001); 
-                gainBody.gain.exponentialRampToValueAtTime(0.001, now + 0.04); 
-                
-                oscBody.connect(gainBody);
-                gainBody.connect(audioContext.destination); 
-                gainBody.connect(delay); 
-
-                const oscClick = audioContext.createOscillator();
-                const gainClick = audioContext.createGain();
-                oscClick.type = 'square'; 
-                
-                oscClick.frequency.setValueAtTime(800 * pitchVar, now);
-                oscClick.frequency.exponentialRampToValueAtTime(100 * pitchVar, now + 0.015);
-                
-                gainClick.gain.setValueAtTime(0, now);
-                gainClick.gain.linearRampToValueAtTime(0.12, now + 0.001);
-                gainClick.gain.exponentialRampToValueAtTime(0.001, now + 0.015);
-                
-                oscClick.connect(gainClick);
-                gainClick.connect(audioContext.destination);
-
-                oscBody.start(now); oscBody.stop(now + 0.05);
-                oscClick.start(now); oscClick.stop(now + 0.02);
-                
-            } catch (e) {}
-        }
-
-        // JENERATİF MÜZİK MOTORU
-        function initGenerativeMusic() {
-            if (bgmStarted) return;
-            bgmStarted = true;
-
-            if (!audioContext) {
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            }
-
-            if (audioContext.state === 'suspended') {
-                audioContext.resume();
-            }
-
-            bgmMasterGain = audioContext.createGain();
-            // Eski değer 0.15 idi, 0.35 yaparak sesi belirgin şekilde artırdık
-            bgmMasterGain.gain.value = soundEnabled ? 0.35 : 0; 
-            bgmMasterGain.connect(audioContext.destination);
-
-            const delay = audioContext.createDelay();
-            delay.delayTime.value = 0.45; 
-            const feedback = audioContext.createGain();
-            feedback.gain.value = 0.5;
-            
-            const lowpass = audioContext.createBiquadFilter();
-            lowpass.type = 'lowpass';
-            lowpass.frequency.value = 800; 
-
-            delay.connect(feedback);
-            feedback.connect(delay);
-            delay.connect(lowpass);
-            lowpass.connect(bgmMasterGain);
-
-            const scale = [130.81, 155.56, 174.61, 196.00, 233.08, 261.63, 311.13];
-            let nextNoteTime = audioContext.currentTime + 0.1;
-
-            function schedule() {
-                if (audioContext.state === 'suspended') {
-                    requestAnimationFrame(schedule);
-                    return;
-                }
-
-                if (nextNoteTime < audioContext.currentTime) {
-                    nextNoteTime = audioContext.currentTime + 0.1;
-                }
-
-                while (nextNoteTime < audioContext.currentTime + 0.15) {
-                    playStochasticNote(nextNoteTime);
-                    const step = Math.random() > 0.6 ? 0.25 : 0.5; 
-                    nextNoteTime += step;
-                }
-                requestAnimationFrame(schedule);
-            }
-
-            function playStochasticNote(time) {
-                if (Math.random() > 0.3) return;
-
-                const osc = audioContext.createOscillator();
-                const noteGain = audioContext.createGain();
-                
-                const freq = scale[Math.floor(Math.random() * scale.length)];
-                
-                osc.detune.value = (Math.random() - 0.5) * 15; 
-                osc.type = Math.random() > 0.5 ? 'sine' : 'triangle';
-                osc.frequency.setValueAtTime(freq, time);
-
-                noteGain.gain.setValueAtTime(0, time);
-                // Eski değer 0.08 idi, 0.18 yaparak her notanın kendi vuruşunu güçlendirdik
-                noteGain.gain.linearRampToValueAtTime(0.18, time + 0.2); 
-                noteGain.gain.exponentialRampToValueAtTime(0.001, time + 1.5); 
-
-                osc.connect(noteGain);
-                noteGain.connect(bgmMasterGain); 
-                noteGain.connect(delay); 
-
-                osc.start(time);
-                osc.stop(time + 1.6);
-            }
-
-            schedule();
-        }
-
-        window.toggleSound = function() {
-            soundEnabled = !soundEnabled;
-            localStorage.setItem("daredrop_sound", soundEnabled ? "on" : "off");
-            updateSoundIcon();
-            
-            if (bgmMasterGain) {
-                const now = audioContext ? audioContext.currentTime : 0;
-                bgmMasterGain.gain.cancelScheduledValues(now);
-                if (soundEnabled) {
-                    if (audioContext.state === 'suspended') audioContext.resume();
-                    // Fade in hedefi 0.35 olarak güncellendi
-                    bgmMasterGain.gain.linearRampToValueAtTime(0.35, now + 0.5);
-                } else {
-                    bgmMasterGain.gain.linearRampToValueAtTime(0, now + 0.5);
-                }
-            }
-            
-            if (soundEnabled) playClick();
-        }
-
-        document.addEventListener('click', (e) => {
-            if (!bgmStarted) {
-                initGenerativeMusic();
-            }
-
-            if (e.target.closest('.btn, .kick-btn, .group-delete-btn, .category-card, .category-current-pill, #sound-toggle, button')) {
-                playClick();
-            }
-        });
-
-        updateSoundIcon();
-    </script>
-                <!-- Generatif arka plan scriptini buraya ekliyoruz -->
-    <script src="generative-bg.js"></script>
-                <!-- Zafer Efekti ve Chime Scripti -->
+<button id="sound-toggle" onclick="window.toggleSound()" title="Toggle button sounds">🔊</button>
+
+<div class="container">
+
+<div id="screen-loading" class="screen active">
+<h1 class="title-glitch">DareDrop_</h1>
+<p style="text-align:center;">Connecting...</p>
+</div>
+
+<div id="screen-login" class="screen">
+<h1 class="title-glitch">DareDrop_</h1>
+<p>> SYSTEM LOGIN.</p>
+<div id="invite-alert" class="card" style="display: none; border-color: var(--text-accent);">
+<p>> You've been invited to a group. Enter your name to join.</p>
+</div>
+<input type="text" id="username" placeholder="Enter your old username or make one up...">
+<button class="btn" id="btn-login">Login / Register</button>
+</div>
+
+<div id="screen-my-groups" class="screen">
+<h1 class="title-glitch">DareDrop_</h1>
+<h2>WELCOME, <span id="display-username" style="color:var(--text-accent);"></span></h2>
+
+<div class="card" id="user-stats-card" style="text-align: center; border-color: var(--text-accent);">
+<p style="margin: 0 0 5px; font-size: 12px; color: #888;">> TOTAL XP EARNED</p>
+<div style="font-size: 38px; color: var(--text-accent); font-weight: bold; line-height: 1;" id="user-total-xp">0</div>
+<div id="rank-display" style="display: none; margin: 8px 0 0;">
+<span class="rank-text">#<span id="rank-popup-num">—</span> globally</span>
+</div>
+<p style="margin: 8px 0 0; font-size: 11px; color: #888;">Across all groups & rounds</p>
+</div>
+
+<button class="btn" id="btn-view-global-leaderboard" style="border-color: var(--timer-color); color: var(--timer-color);">View Global Leaderboard</button>
+
+<div class="card">
+<h3 style="margin-top:0; font-size:14px;">> MY GROUPS</h3>
+<div id="group-list-container"></div>
+</div>
+
+<div class="card" style="border-color: #555;">
+<h3 style="margin-top:0; font-size:14px; color:#aaa;">> CREATE NEW GROUP</h3>
+<input type="text" id="new-group-name" placeholder="Group Name (e.g., Office Squad)...">
+<button class="btn" id="btn-create-group" style="border-color: #aaa; color: #aaa;">Create</button>
+</div>
+
+<button class="btn" style="border-color: #555; color: #555; margin-top: 30px;" onclick="switchUser()">Switch User (Logout)</button>
+</div>
+
+<div id="screen-dashboard" class="screen">
+<h2>GROUP: <span id="display-group"></span></h2>
+
+<div id="admin-panel" class="card" style="display: none; border-color: var(--admin-color);">
+<h3 style="margin-top:0; font-size:14px; color:var(--admin-color);">> ADMIN PANEL</h3>
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+<label style="font-size: 14px;">Max Member Capacity:</label>
+<input type="number" id="max-members-input" style="width: 80px; margin: 0; text-align: center;">
+</div>
+
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+<label style="font-size: 14px;">Time Limit (Hrs/Mins):</label>
+<div style="display: flex; gap: 5px;">
+<input type="number" id="challenge-hours-input" placeholder="Hrs" style="width: 60px; margin: 0; text-align: center;" min="0">
+<input type="number" id="challenge-mins-input" placeholder="Mins" style="width: 60px; margin: 0; text-align: center;" min="0">
+</div>
+</div>
+
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 10px;">
+<label style="font-size: 14px;">Challenge Category:</label>
+<button type="button" id="btn-pick-category" class="category-current-pill">
+<span id="current-category-emoji">🎲</span>
+<span id="current-category-name">Loading...</span>
+<span style="margin-left: 4px; opacity: 0.6;">▾</span>
+</button>
+</div>
+
+<label style="font-size: 14px; display: flex; align-items: center; gap: 10px; cursor: pointer;">
+<input type="checkbox" id="admin-invite-checkbox" style="width: 18px; height: 18px;">
+Only Admin Can Invite
+</label>
+<label style="font-size: 14px; display: flex; align-items: center; gap: 10px; cursor: pointer; margin-top: 8px;">
+<input type="checkbox" id="public-voting-checkbox" style="width: 18px; height: 18px;">
+Enable Public Voting
+</label>
+<p style="font-size: 11px; color: #888; margin: 5px 0 0 28px;">Anyone with the public link can vote anonymously. Round won't end early — waits for full timer.</p>
+<button class="btn btn-admin" id="btn-save-admin" style="padding: 8px; margin-top: 15px; font-size: 14px;">Save Settings</button>
+</div>
+
+<div id="invite-section" class="card" style="border-color: var(--text-accent); text-align: center;">
+<p style="margin-top: 0; font-size: 14px;">> GATHER THE SQUAD</p>
+<button class="btn btn-accent" id="btn-copy-invite">Copy Invite Link</button>
+</div>
+
+<div id="public-vote-status" class="card" style="display: none; border-color: #ff66cc; text-align: center;">
+<p style="margin-top: 0; font-size: 14px; color: #ff66cc;">> PUBLIC VOTING <span id="pv-status-label">OFF</span></p>
+<p id="pv-status-desc" style="font-size: 11px; color: #888; margin: 5px 0 10px;"></p>
+<button class="btn" id="btn-copy-public-vote" style="border-color: #ff66cc; color: #ff66cc; display:none;">Copy Public Vote Link</button>
+</div>
+
+<div class="card">
+<h3 style="margin-top:0; font-size:14px; display:flex; justify-content:space-between;">
+<span>> LEADERBOARD</span>
+<span style="color:#888;"><span id="current-count">0</span> / <span id="max-count">10</span></span>
+</h3>
+<ul id="member-list-ui" class="member-list"></ul>
+</div>
+
+<div class="card" style="border-color: var(--timer-color);">
+<h3 style="margin-top: 0; color: var(--timer-color);">> THE CHALLENGE</h3>
+<p id="daily-challengeText">Loading...</p>
+
+<div style="border-top: 1px dashed var(--timer-color); margin-top: 15px; padding-top: 10px;">
+<p id="survival-status" style="margin:0; font-size: 14px; text-align: center; font-weight:bold;"></p>
+<div id="time-remaining-display" class="timer-display">--:--:--</div>
+</div>
+
+<div id="interaction-section" style="margin-top: 15px;">
+<!-- Dynamic Interactions render here -->
+</div>
+</div>
+
+<button class="btn" style="border-color: var(--timer-color); color: var(--timer-color);" onclick="window.showHistory()">View Past Challenges</button>
+
+<button class="btn btn-admin" id="btn-reroll" style="display: none;">Reroll & Draft New Round</button>
+<button class="btn" style="border-color: #555; color: #555;" onclick="renderMyGroups()">< Back to My Groups</button>
+</div>
+
+<div id="screen-public-vote" class="screen">
+<h1 class="title-glitch">DareDrop_</h1>
+<h2>PUBLIC VOTE: <span id="pv-group-name" style="color:var(--text-accent);"></span></h2>
+
+<div class="card" style="border-color: var(--timer-color);">
+<h3 style="margin-top: 0; color: var(--timer-color); font-size: 14px;">> THE CHALLENGE</h3>
+<p id="pv-challenge-text" style="font-size: 14px;">Loading...</p>
+<div style="border-top: 1px dashed var(--timer-color); margin-top: 10px; padding-top: 10px;">
+<p style="margin:0; font-size: 12px; text-align: center; color:#888;">Time remaining</p>
+<div id="pv-time-remaining" class="timer-display">--:--:--</div>
+</div>
+</div>
+
+<div id="pv-status-banner" class="card" style="border-color: #ff66cc; text-align: center;">
+<p style="margin: 0; font-size: 13px; color: #ff66cc;" id="pv-banner-text">> CAST YOUR VOTES BELOW (anonymous)</p>
+</div>
+
+<div id="pv-submissions-container"></div>
+
+<div id="pv-join-cta" class="card" style="display:none; border-color: var(--text-main); text-align: center; background: #001a00;">
+<h3 style="margin: 0 0 10px; color: var(--text-main); font-size: 14px;">> THANKS FOR VOTING!</h3>
+<p style="font-size: 13px; margin: 5px 0;">Wanna run your own dares with your friends?</p>
+<p style="font-size: 12px; color: #888; margin: 5px 0 15px;">Make a group, drop the chaos, kick the slackers.</p>
+<button class="btn btn-accent" onclick="window.publicVoterJoinSite()">Join DareDrop</button>
+</div>
+
+<div class="status" style="margin-top: 20px;">You vote anonymously. One vote per submission per device.</div>
+</div>
+
+<div id="screen-history" class="screen">
+<h1 class="title-glitch">DareDrop_</h1>
+<h2>PAST CHALLENGES</h2>
+
+<div id="history-list-container" style="margin-bottom: 20px;"></div>
+
+<button class="btn btn-accent" onclick="showScreen('screen-dashboard')">< Back to Dashboard</button>
+</div>
+
+<div class="status" id="system-status">Version: MVP v7.0 // Status: Enhanced Admin Menu</div>
+</div>
+
+<!-- Category picker overlay (mobile-friendly modal) -->
+<div id="category-overlay" class="overlay-backdrop" onclick="if(event.target===this)closeCategoryOverlay()">
+<div class="overlay-sheet">
+<h2 style="font-size: 18px;">SELECT CATEGORY</h2>
+<p style="font-size: 12px; color: #888; margin-top: -5px;">Reroll will draft only from this category.</p>
+<div id="category-list-container"></div>
+<button class="btn" style="margin-top: 15px; border-color: #555; color: #555;" onclick="closeCategoryOverlay()">Cancel</button>
+</div>
+</div>
+
+<!-- Global leaderboard overlay -->
+<div id="global-leaderboard-overlay" class="overlay-backdrop" onclick="if(event.target===this)closeGlobalLeaderboardOverlay()">
+<div class="overlay-sheet">
+<h2 style="font-size: 18px;">GLOBAL LEADERBOARD</h2>
+<p style="font-size: 12px; color: #888; margin-top: -5px;">Top XP across the whole platform.</p>
+<ul id="global-leaderboard-list" class="member-list">
+<li style="color:#888; font-size:12px; justify-content:center;">Loading...</li>
+</ul>
+<button class="btn" style="margin-top: 15px; border-color: #555; color: #555;" onclick="closeGlobalLeaderboardOverlay()">Close</button>
+</div>
+</div>
+
+<!-- Firebase SDKs -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+import { getFirestore, collection, doc, setDoc, getDoc, updateDoc, arrayUnion, deleteDoc, increment, query, orderBy, limit, getDocs, where, getCountFromServer } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+import { getAuth, signInAnonymously, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+
+const firebaseConfig = {
+apiKey: "AIzaSyD8H6gbz2MjLvGymm5TYtwffMPrJ1R4_qM",
+authDomain: "daredrop-8b4dd.firebaseapp.com",
+projectId: "daredrop-8b4dd",
+storageBucket: "daredrop-8b4dd.firebasestorage.app",
+messagingSenderId: "380587778608",
+appId: "1:380587778608:web:5d8c7e1cc0d50837c5c3f5"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+
+let currentUserName = localStorage.getItem("daredrop_username") || "";
+let userData = null; 
+let currentGroupId = null;
+let currentGroupData = null;
+let countdownTimer = null;
+let publicVoteCountdownTimer = null;
+let publicVoteGroupId = null;
+let publicVoteGroupData = null;
+
+const urlParams = new URLSearchParams(window.location.search);
+const inviteGroupId = urlParams.get('groupId');
+const publicVoteIdFromUrl = urlParams.get('publicVoteId');
+
+// Anonymous public-voter ID — persisted per-device for abuse protection.
+// One ID = one vote allowed per submission. Cleared with localStorage by user.
+function getPublicVoterId() {
+let pid = localStorage.getItem("daredrop_public_voter_id");
+if (!pid) {
+pid = "pv_" + Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+localStorage.setItem("daredrop_public_voter_id", pid);
+}
+return pid;
+}
+
+// Fallback data — used if challenges.json fails to load (network, parse, etc.)
+// Keep this small but functional. The "real" data lives in challenges.json.
+const FALLBACK_CHALLENGE_DATA = {
+version: 0,
+categories: [
+{
+id: "mild",
+name: "Mild",
+emoji: "🌶️",
+description: "Easy social antics. Low risk, high charm.",
+challenges: [
+"Compliment someone in the friend group unexpectedly but genuinely. Share it in your story with one sentence.",
+"Promote the most boring thing you ate today as if it were a Michelin-starred meal."
+]
+},
+{
+id: "spicy",
+name: "Spicy",
+emoji: "🔥",
+description: "A little drama, a little cringe.",
+challenges: [
+"Strike your most dramatic pose with the lowest effort possible and share it.",
+"Voice over your current view as if you're shooting a documentary and share it.",
+"Hum your favorite song for 5 seconds without making any facial expressions and share it."
+]
+}
+]
+};
+
+let challengeData = FALLBACK_CHALLENGE_DATA;
+let challengeDataLoaded = false;
+
+// Load challenges from sibling JSON file. Same-origin → no CORS issues.
+// Cache-busting via ?v=... is optional; HTTP cache works fine for most cases.
+async function loadChallengeData() {
+try {
+const res = await fetch('./challenges.json', { cache: 'default' });
+if (!res.ok) throw new Error('HTTP ' + res.status);
+const data = await res.json();
+if (!data.categories || !Array.isArray(data.categories) || data.categories.length === 0) {
+throw new Error('Invalid shape: missing categories array');
+}
+challengeData = data;
+challengeDataLoaded = true;
+console.log(`[challenges.json] loaded v${data.version || '?'} with ${data.categories.length} categories`);
+} catch (e) {
+console.warn("[challenges.json] failed, using fallback:", e.message);
+challengeData = FALLBACK_CHALLENGE_DATA;
+challengeDataLoaded = false;
+}
+}
+
+function getCategoryById(id) {
+if (!id) return challengeData.categories[0];
+return challengeData.categories.find(c => c.id === id) || challengeData.categories[0];
+}
+
+function getRandomChallengeFromCategory(categoryId) {
+const cat = getCategoryById(categoryId);
+if (!cat || !cat.challenges || cat.challenges.length === 0) {
+return "No challenges available in this category.";
+}
+return cat.challenges[Math.floor(Math.random() * cat.challenges.length)];
+}
+
+// Kick off the load immediately — auth + UI may already wait for it implicitly.
+loadChallengeData();
+
+window.showScreen = function(screenId) {
+document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+document.getElementById(screenId).classList.add('active');
+}
+
+onAuthStateChanged(auth, async (user) => {
+if (user) {
+// Public-vote links bypass login completely — anyone can vote anonymously.
+if (publicVoteIdFromUrl) {
+await loadPublicVotePage(publicVoteIdFromUrl);
+return;
+}
+if (currentUserName) {
+await loadUserProfile(currentUserName);
+} else {
+showScreen('screen-login');
+if(inviteGroupId) document.getElementById('invite-alert').style.display = 'block';
+}
+} else {
+signInAnonymously(auth).catch((e) => console.error(e));
+}
+});
+
+async function loadUserProfile(username) {
+currentUserName = username;
+localStorage.setItem("daredrop_username", username);
+
+const userRefId = username.toLowerCase();
+const userDoc = await getDoc(doc(db, "users", userRefId));
+
+if (userDoc.exists()) {
+userData = userDoc.data();
+// Lazy migration for legacy users created before totalXp existed.
+if (userData.totalXp === undefined) {
+userData.totalXp = 0;
+await updateDoc(doc(db, "users", userRefId), { totalXp: 0 });
+}
+} else {
+userData = { name: username, groups: [], totalXp: 0 };
+await setDoc(doc(db, "users", userRefId), userData);
+}
+
+if (inviteGroupId) {
+await joinExistingGroup(inviteGroupId);
+window.history.replaceState(null, "", window.location.pathname);
+} else {
+window.renderMyGroups();
+}
+}
+
+document.getElementById('btn-login').addEventListener('click', async () => {
+const username = document.getElementById('username').value.trim();
+if (!username) return alert("You must provide a name.");
+
+document.getElementById('btn-login').innerText = "Loading...";
+await loadUserProfile(username);
+document.getElementById('btn-login').innerText = "Login / Register";
+});
+
+// REWRITTEN: Now checks database to apply admin tags and clean up deleted groups
+window.renderMyGroups = async function() {
+showScreen('screen-my-groups');
+if (countdownTimer) clearInterval(countdownTimer); 
+document.getElementById('display-username').innerText = userData.name;
+
+// Kick off global stats in parallel — don't block group rendering on it.
+loadGlobalStats();
+
+const container = document.getElementById('group-list-container');
+
+if (!userData.groups || userData.groups.length === 0) {
+container.innerHTML = "<p style='color:#888; font-size:12px;'>You are not a member of any group yet.</p>";
+return;
+}
+
+container.innerHTML = "<p style='color:#888; font-size:12px; text-align:center;'>Loading groups...</p>";
+
+const validGroups = [];
+let needsDbUpdate = false;
+
+container.innerHTML = ""; 
+
+for (let i = 0; i < userData.groups.length; i++) {
+const groupInfo = userData.groups[i];
+const docSnap = await getDoc(doc(db, "groups", groupInfo.id));
+
+if (!docSnap.exists()) {
+// Group was deleted by admin, flag for cleanup
+needsDbUpdate = true;
+} else {
+validGroups.push(groupInfo);
+const gData = docSnap.data();
+const isAdmin = gData.adminName === currentUserName;
+
+const row = document.createElement('div');
+row.className = "group-list-item";
+
+const btn = document.createElement('button');
+btn.className = "btn group-list-btn";
+btn.innerHTML = "> " + groupInfo.name + (isAdmin ? " <span style='color:var(--admin-color); font-size:10px; font-weight:bold;'>(ADMIN)</span>" : "");
+btn.onclick = () => openDashboard(groupInfo.id);
+row.appendChild(btn);
+
+// Add Delete button if Admin
+if (isAdmin) {
+const delBtn = document.createElement('button');
+delBtn.className = "group-delete-btn";
+delBtn.innerText = "X";
+delBtn.onclick = (e) => {
+e.stopPropagation(); 
+deleteGroupFromMenu(groupInfo.id);
+};
+row.appendChild(delBtn);
+}
+
+container.appendChild(row);
+}
+}
+
+// If we found deleted groups, update the user profile in Firestore silently
+if (needsDbUpdate) {
+userData.groups = validGroups;
+const userRefId = currentUserName.toLowerCase();
+await updateDoc(doc(db, "users", userRefId), {
+groups: validGroups
+});
+if (validGroups.length === 0) {
+container.innerHTML = "<p style='color:#888; font-size:12px;'>You are not a member of any group yet.</p>";
+}
+}
+}
+
+// NEW: Delete from menu function
+window.deleteGroupFromMenu = async function(groupId) {
+if(confirm("Are you sure you want to PERMANENTLY delete this group? This action cannot be undone!")) {
+await deleteDoc(doc(db, "groups", groupId));
+// Simply re-rendering will automatically clean it out of the local view and database
+window.renderMyGroups();
+}
+}
+
+document.getElementById('btn-create-group').addEventListener('click', async () => {
+const groupName = document.getElementById('new-group-name').value.trim();
+if(!groupName) return;
+
+document.getElementById('btn-create-group').innerText = "...";
+const newGroupId = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+const defaultCategory = challengeData.categories[0];
+const initialGroupData = {
+name: groupName,
+adminName: currentUserName,
+maxMembers: 10,
+adminOnlyInvites: false,
+publicVotingEnabled: false,
+challengeDurationHours: 24, 
+challengeDurationMins: 0,
+challengeStartTime: null, 
+challengeStatus: 'pending', 
+currentCategoryId: defaultCategory.id,
+currentChallenge: defaultCategory.challenges[0] || "Make up your own dare.",
+members: [currentUserName],
+submissions: {}, 
+leaderboard: { [currentUserName]: 0 },
+challengeHistory: [], 
+historyIndex: 0,      
+createdAt: new Date()
+};
+
+await setDoc(doc(db, "groups", newGroupId), initialGroupData);
+
+const groupInfo = { id: newGroupId, name: groupName };
+const userRefId = currentUserName.toLowerCase();
+await updateDoc(doc(db, "users", userRefId), {
+groups: arrayUnion(groupInfo)
+});
+
+userData.groups.push(groupInfo);
+document.getElementById('new-group-name').value = "";
+document.getElementById('btn-create-group').innerText = "Create";
+
+openDashboard(newGroupId);
+});
+
+async function joinExistingGroup(groupId) {
+try {
+const groupRef = doc(db, "groups", groupId);
+const docSnap = await getDoc(groupRef);
+
+if (docSnap.exists()) {
+const groupData = docSnap.data();
+const isAlreadyMember = groupData.members.includes(currentUserName);
+
+if (!isAlreadyMember) {
+if(groupData.members.length >= groupData.maxMembers) {
+alert("Sorry, this group has reached its maximum capacity.");
+window.renderMyGroups();
+return;
+}
+
+const currentLeaderboard = groupData.leaderboard || {};
+if (currentLeaderboard[currentUserName] === undefined) {
+currentLeaderboard[currentUserName] = 0;
+}
+
+await updateDoc(groupRef, { 
+members: arrayUnion(currentUserName),
+leaderboard: currentLeaderboard
+});
+
+const groupInfo = { id: groupId, name: groupData.name };
+const userRefId = currentUserName.toLowerCase();
+await updateDoc(doc(db, "users", userRefId), {
+groups: arrayUnion(groupInfo)
+});
+userData.groups.push(groupInfo);
+}
+openDashboard(groupId);
+} else {
+// UPDATED ALERT MESSAGE
+alert("This group no longer exists or the invite link is invalid.");
+window.renderMyGroups();
+}
+} catch (e) {
+alert("Error: " + e.message);
+window.renderMyGroups();
+}
+}
+
+async function openDashboard(groupId) {
+currentGroupId = groupId;
+document.getElementById('member-list-ui').innerHTML = "<li>Loading...</li>";
+showScreen('screen-dashboard');
+
+await refreshGroupData();
+}
+
+async function refreshGroupData() {
+const docSnap = await getDoc(doc(db, "groups", currentGroupId));
+
+if(!docSnap.exists()) {
+alert("This group has been deleted.");
+window.renderMyGroups();
+return;
+}
+
+currentGroupData = docSnap.data();
+
+const amIStillMember = currentGroupData.members.includes(currentUserName);
+if(!amIStillMember) {
+alert("You failed to survive or were kicked from this group.");
+window.renderMyGroups();
+return;
+}
+
+const isAdmin = currentGroupData.adminName === currentUserName;
+const submissions = currentGroupData.submissions || {};
+const status = currentGroupData.challengeStatus || 'active'; 
+
+// Auto-resolve early if every member has both submitted and voted.
+// The check mirrors resolveChallengeAndKick's per-member logic.
+// SKIPPED when public voting is enabled — round must wait for full timer
+// so external voters get the entire window to weigh in.
+if (status === 'active' && currentGroupData.members.length > 0 && !currentGroupData.publicVotingEnabled) {
+const allComplete = currentGroupData.members.every(member => {
+if (!submissions[member]) return false;
+const others = Object.keys(submissions).filter(m => m !== member);
+if (others.length === 0) return true; // no one else submitted yet
+return others.some(o => submissions[o].votes && submissions[o].votes[member] !== undefined);
+});
+if (allComplete) {
+resolveChallengeAndKick(); // will trigger another refreshGroupData with status='resolved'
+return;
+}
+}
+
+document.getElementById('display-group').innerText = currentGroupData.name;
+document.getElementById('current-count').innerText = currentGroupData.members.length;
+document.getElementById('max-count').innerText = currentGroupData.maxMembers;
+
+const activeChallenge = currentGroupData.currentChallenge || (challengeData.categories[0]?.challenges[0]) || "—";
+document.getElementById('daily-challengeText').innerText = '"' + activeChallenge + '"';
+
+document.getElementById('admin-panel').style.display = isAdmin ? 'block' : 'none';
+document.getElementById('btn-reroll').style.display = isAdmin ? 'block' : 'none';
+
+if(isAdmin) {
+document.getElementById('max-members-input').value = currentGroupData.maxMembers;
+document.getElementById('challenge-hours-input').value = currentGroupData.challengeDurationHours !== undefined ? currentGroupData.challengeDurationHours : 24;
+document.getElementById('challenge-mins-input').value = currentGroupData.challengeDurationMins || 0;
+document.getElementById('admin-invite-checkbox').checked = currentGroupData.adminOnlyInvites;
+document.getElementById('public-voting-checkbox').checked = !!currentGroupData.publicVotingEnabled;
+
+// Update category pill display
+const cat = getCategoryById(currentGroupData.currentCategoryId);
+document.getElementById('current-category-emoji').innerText = cat.emoji || '🎲';
+document.getElementById('current-category-name').innerText = cat.name || 'Default';
+}
+
+if(currentGroupData.adminOnlyInvites && !isAdmin) {
+document.getElementById('invite-section').style.display = 'none';
+} else {
+document.getElementById('invite-section').style.display = 'block';
+}
+
+// Public voting status — visible to ALL members so they know the rules.
+const pvCard = document.getElementById('public-vote-status');
+const pvLabel = document.getElementById('pv-status-label');
+const pvDesc = document.getElementById('pv-status-desc');
+const pvCopyBtn = document.getElementById('btn-copy-public-vote');
+pvCard.style.display = 'block';
+if (currentGroupData.publicVotingEnabled) {
+pvCard.style.borderColor = '#ff66cc';
+pvLabel.innerText = 'ON';
+pvLabel.style.color = '#ff66cc';
+pvDesc.innerText = 'Outsiders can vote anonymously via the public link. Round runs the full timer.';
+pvCopyBtn.style.display = 'block'; // ALL members can share — viral.
+} else {
+pvCard.style.borderColor = '#444';
+pvLabel.innerText = 'OFF';
+pvLabel.style.color = '#888';
+pvDesc.innerText = isAdmin ? 'Toggle it on in the admin panel above to let outsiders vote.' : 'Only admin can enable this.';
+pvCopyBtn.style.display = 'none';
+}
+
+const hasSubmitted = !!submissions[currentUserName];
+const otherSubmissions = Object.keys(submissions).filter(m => m !== currentUserName);
+let hasVoted = (otherSubmissions.length === 0); 
+
+if (!hasVoted) {
+hasVoted = otherSubmissions.some(other => submissions[other].votes && submissions[other].votes[currentUserName] !== undefined);
+}
+
+const isSafe = hasSubmitted && hasVoted;
+const statusEl = document.getElementById('survival-status');
+const interactionDiv = document.getElementById('interaction-section');
+interactionDiv.innerHTML = "";
+
+if (status === 'pending') {
+statusEl.innerText = "WAITING FOR ADMIN TO START.";
+statusEl.style.color = "var(--admin-color)";
+document.getElementById('time-remaining-display').innerText = "00:00:00";
+
+if (isAdmin) {
+interactionDiv.innerHTML = `<button class="btn btn-admin" style="font-size: 18px; padding: 15px;" onclick="startChallengeNow()">START CHALLENGE</button>`;
+}
+} else if (status === 'resolved') {
+statusEl.innerText = "ROUND OVER! Waiting for admin to draft new round.";
+statusEl.style.color = "#888";
+} else {
+if (isSafe) {
+statusEl.innerText = "✅ YOU ARE SAFE FROM THE KICK.";
+statusEl.style.color = "var(--text-main)";
+} else if (!hasSubmitted) {
+statusEl.innerText = "❌ SUBMIT A LINK TO SURVIVE!";
+statusEl.style.color = "var(--text-accent)";
+} else {
+statusEl.innerText = "❌ YOU MUST VOTE TO SURVIVE!";
+statusEl.style.color = "var(--text-accent)";
+}
+
+if (!hasSubmitted) {
+interactionDiv.innerHTML = `
+                       <input type="text" id="proof-link-input" placeholder="Paste your story/post link here...">
+                       <button class="btn btn-accent" onclick="submitProof()">Submit Proof</button>
+                   `;
+} else {
+// Show submitter their own proof first
+const mySub = submissions[currentUserName];
+const myEmbedHtml = getEmbedHtml(mySub.link);
+const myProofDisplay = myEmbedHtml
+? `${myEmbedHtml}<p style="font-size:11px; color:#888; margin:5px 0 0; text-align:right;"><a href="${mySub.link}" target="_blank" style="color:#888;">↗ Open original</a></p>`
+: `<p style="margin:5px 0; font-size:12px; color:#ff9900; padding:8px; border:1px dashed #555;">⚠️ This link can't be embedded. <a href="${mySub.link}" target="_blank" style="color:var(--timer-color);">Click to open</a></p>`;
+let votingHtml = `<h4 style='color:var(--timer-color); margin-bottom:5px;'>> YOUR PROOF</h4>
+                       <div style="border:1px solid var(--timer-color); padding:10px; margin-bottom:15px;">
+                           ${myProofDisplay}
+                       </div>`;
+votingHtml += "<h4 style='color:var(--text-main); margin-bottom:5px;'>> VOTE ON OTHERS</h4>";
+if (otherSubmissions.length === 0) {
+votingHtml += "<p style='font-size:12px; color:#888;'>No other submissions yet. You are safe!</p>";
+} else {
+otherSubmissions.forEach(other => {
+const sub = submissions[other];
+const myVote = sub.votes ? sub.votes[currentUserName] : null;
+const embedHtml = getEmbedHtml(sub.link);
+const proofDisplay = embedHtml
+? `${embedHtml}<p style="font-size:11px; color:#888; margin:5px 0 0; text-align:right;"><a href="${sub.link}" target="_blank" style="color:#888;">↗ Open original</a></p>`
+: `<p style="margin:5px 0; font-size:12px; color:#ff9900; padding:8px; border:1px dashed #555;">⚠️ This link can't be embedded. <a href="${sub.link}" target="_blank" style="color:var(--timer-color);">Click to open</a></p>`;
+
+votingHtml += `<div style="border:1px solid #333; padding:10px; margin-bottom:10px;">
+                               <p style="margin-top:0; margin-bottom:8px; font-size:14px;"><strong>${other}</strong></p>
+                               ${proofDisplay}`;
+
+if (myVote !== null && myVote !== undefined) {
+votingHtml += `<p style="font-size:12px; color:var(--text-main); margin:0;">You awarded ${myVote} XP.</p>`;
+} else {
+votingHtml += `
+                                   <div data-vote-target="${other}" style="display:flex; gap:5px; flex-wrap: wrap;">
+                                       <button class="btn" style="padding:5px; margin:0; font-size:10px; flex:1;" onclick="castVote('${other}', 50)">Legendary (50)</button>
+                                       <button class="btn" style="padding:5px; margin:0; font-size:10px; flex:1;" onclick="castVote('${other}', 30)">Did it (30)</button>
+                                       <button class="btn" style="padding:5px; margin:0; font-size:10px; flex:1;" onclick="castVote('${other}', 10)">Weak (10)</button>
+                                       <button class="btn" style="padding:5px; margin:0; font-size:10px; flex:1; border-color:#ff0000; color:#ff0000;" onclick="castVote('${other}', 0)">Sus (0)</button>
+                                   </div>
+                               `;
+}
+votingHtml += `</div>`;
+});
+}
+interactionDiv.innerHTML = votingHtml;
+}
+}
+
+renderLeaderboard();
+
+if(status === 'active') {
+startCountdown();
+} else if (countdownTimer) {
+clearInterval(countdownTimer);
+}
+}
+
+window.startChallengeNow = async function() {
+if(!confirm("Start the countdown for everyone now?")) return;
+await updateDoc(doc(db, "groups", currentGroupId), {
+challengeStatus: 'active',
+challengeStartTime: Date.now()
+});
+refreshGroupData();
+}
+
+function renderLeaderboard() {
+if (!currentGroupData || !currentGroupData.members) return;
+const lb = currentGroupData.leaderboard || {};
+const status = currentGroupData.challengeStatus || 'active';
+const isAdmin = currentGroupData.adminName === currentUserName;
+const listUI = document.getElementById('member-list-ui');
+listUI.innerHTML = "";
+
+const sortedMembers = currentGroupData.members.slice().sort((a, b) => (lb[b] || 0) - (lb[a] || 0));
+
+sortedMembers.forEach((memberName, idx) => {
+const li = document.createElement('li');
+let nameHtml = `${memberName} - <strong>${lb[memberName] || 0} XP</strong>`;
+
+if (memberName === currentGroupData.adminName) {
+nameHtml += " <span style='color:var(--admin-color); font-size:10px;'>(ADMIN)</span>";
+}
+if (memberName === currentUserName) {
+nameHtml += " <span style='color:#888; font-size:10px;'>(YOU)</span>";
+}
+
+let actionHtml = "";
+if (isAdmin && memberName !== currentUserName && status !== 'resolved') {
+actionHtml = `<button class="kick-btn" onclick="kickMember('${memberName}')">Kick</button>`;
+}
+
+if (status === 'resolved') {
+const rankPrefix = `<span style="color:var(--timer-color); font-weight:bold; margin-right:6px;">#${idx + 1}</span>`;
+const sub = (currentGroupData.submissions || {})[memberName];
+let proofBlock = "";
+if (sub && sub.link) {
+const embedHtml = getEmbedHtml(sub.link);
+proofBlock = embedHtml
+? `<div style="margin-top:8px;">${embedHtml}<p style="font-size:11px; color:#888; margin:5px 0 0; text-align:right;"><a href="${sub.link}" target="_blank" style="color:#888;">↗ Open original</a></p></div>`
+: `<p style="margin:8px 0 0; font-size:12px; color:#ff9900; padding:8px; border:1px dashed #555;">⚠️ This link can't be embedded. <a href="${sub.link}" target="_blank" style="color:var(--timer-color);">Click to open</a></p>`;
+} else {
+proofBlock = `<p style="margin:8px 0 0; font-size:11px; color:#666; font-style:italic;">No submission</p>`;
+}
+li.style.flexDirection = 'column';
+li.style.alignItems = 'stretch';
+li.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center; width:100%;"><span>${rankPrefix}${nameHtml}</span> ${actionHtml}</div>${proofBlock}`;
+} else {
+li.innerHTML = `<span>${nameHtml}</span> ${actionHtml}`;
+}
+listUI.appendChild(li);
+});
+}
+
+// Detect Instagram (post/reel) and TikTok URLs and return an iframe embed.
+// Returns null for unsupported URLs so caller can show a fallback.
+function getEmbedHtml(url) {
+if (!url || typeof url !== 'string') return null;
+
+// Instagram post or reel: instagram.com/p/SHORTCODE or instagram.com/reel/SHORTCODE
+const igMatch = url.match(/instagram\.com\/(p|reel)\/([A-Za-z0-9_-]+)/);
+if (igMatch) {
+const type = igMatch[1];
+const id = igMatch[2];
+return `<iframe src="https://www.instagram.com/${type}/${id}/embed/" 
+                           width="100%" height="540" frameborder="0" scrolling="no" allowtransparency="true"
+                           loading="lazy"
+                           style="border:1px solid #333; background:#000; max-width:500px; display:block;"></iframe>`;
+}
+
+// TikTok video with numeric ID: tiktok.com/@user/video/1234567890
+const ttMatch = url.match(/tiktok\.com\/@[^/]+\/video\/(\d+)/);
+if (ttMatch) {
+const id = ttMatch[1];
+return `<iframe src="https://www.tiktok.com/embed/v2/${id}" 
+                           width="100%" height="600" frameborder="0" scrolling="no" 
+                           allow="encrypted-media;" loading="lazy"
+                           style="border:1px solid #333; background:#000; max-width:325px; display:block;"></iframe>`;
+}
+
+// Unsupported (vm.tiktok.com short links, screenshots, private accounts, other platforms)
+return null;
+}
+
+window.submitProof = async function() {
+const linkInput = document.getElementById('proof-link-input').value.trim();
+if (!linkInput) return alert("Please paste a link to your post/story.");
+
+const groupRef = doc(db, "groups", currentGroupId);
+await updateDoc(groupRef, {
+[`submissions.${currentUserName}`]: { link: linkInput, votes: {} }
+});
+refreshGroupData();
+}
+
+window.castVote = async function(targetUser, points) {
+const groupRef = doc(db, "groups", currentGroupId);
+await updateDoc(groupRef, {
+[`submissions.${targetUser}.votes.${currentUserName}`]: points,
+[`leaderboard.${targetUser}`]: increment(points)
+});
+
+// Cumulative global XP — survives rerolls (group leaderboard resets, this doesn't).
+try {
+await updateDoc(doc(db, "users", targetUser.toLowerCase()), {
+totalXp: increment(points)
+});
+} catch (e) {
+console.warn("Couldn't bump global totalXp for", targetUser, e.message);
+}
+
+// Optimistic local-state update so subsequent renders & checks see the new vote.
+if (!currentGroupData.submissions) currentGroupData.submissions = {};
+if (!currentGroupData.submissions[targetUser]) currentGroupData.submissions[targetUser] = { votes: {} };
+if (!currentGroupData.submissions[targetUser].votes) currentGroupData.submissions[targetUser].votes = {};
+currentGroupData.submissions[targetUser].votes[currentUserName] = points;
+if (!currentGroupData.leaderboard) currentGroupData.leaderboard = {};
+currentGroupData.leaderboard[targetUser] = (currentGroupData.leaderboard[targetUser] || 0) + points;
+
+// If this vote completes the round, do a full refresh so the resolved state takes over.
+// Skipped when public voting is on — full timer must run out first.
+if (!currentGroupData.publicVotingEnabled) {
+const subs = currentGroupData.submissions;
+const allComplete = currentGroupData.members.every(member => {
+if (!subs[member]) return false;
+const others = Object.keys(subs).filter(m => m !== member);
+if (others.length === 0) return true;
+return others.some(o => subs[o].votes && subs[o].votes[member] !== undefined);
+});
+if (allComplete) {
+return refreshGroupData();
+}
+}
+
+// Otherwise: targeted DOM updates only — keeps every other iframe alive.
+const voteEl = document.querySelector(`[data-vote-target="${CSS.escape(targetUser)}"]`);
+if (voteEl) {
+const replacement = document.createElement('p');
+replacement.style.cssText = "font-size:12px; color:var(--text-main); margin:0;";
+replacement.textContent = `You awarded ${points} XP.`;
+voteEl.replaceWith(replacement);
+} else {
+// Fallback if the element disappeared somehow
+refreshGroupData();
+return;
+}
+
+// If this was the user's first vote, they're now safe — update status text.
+const statusEl = document.getElementById('survival-status');
+if (statusEl && statusEl.innerText.includes('MUST VOTE')) {
+statusEl.innerText = "✅ YOU ARE SAFE FROM THE KICK.";
+statusEl.style.color = "var(--text-main)";
+}
+
+// Re-render leaderboard with new XP totals (no iframes during 'active' state, so cheap).
+renderLeaderboard();
+}
+
+window.resolveChallengeAndKick = async function() {
+const docRef = doc(db, "groups", currentGroupId);
+const docSnap = await getDoc(docRef);
+const data = docSnap.data();
+
+if (data.challengeStatus !== 'active') return; 
+
+const submissions = data.submissions || {};
+const survivingMembers = [];
+
+data.members.forEach(member => {
+const hasSubmitted = !!submissions[member];
+const otherSubmissions = Object.keys(submissions).filter(m => m !== member);
+let hasVoted = (otherSubmissions.length === 0);
+
+if (!hasVoted) {
+hasVoted = otherSubmissions.some(other => submissions[other].votes && submissions[other].votes[member] !== undefined);
+}
+
+if (hasSubmitted && hasVoted) {
+survivingMembers.push(member);
+}
+});
+
+await updateDoc(docRef, {
+challengeStatus: 'resolved',
+members: survivingMembers
+});
+
+refreshGroupData();
+}
+
+function startCountdown() {
+if (countdownTimer) clearInterval(countdownTimer);
+
+const startTime = currentGroupData.challengeStartTime || Date.now();
+const durationHours = currentGroupData.challengeDurationHours !== undefined ? currentGroupData.challengeDurationHours : 24;
+const durationMins = currentGroupData.challengeDurationMins || 0;
+
+const totalMs = (durationHours * 60 * 60 * 1000) + (durationMins * 60 * 1000);
+const deadline = startTime + totalMs;
+
+const displayEl = document.getElementById('time-remaining-display');
+
+countdownTimer = setInterval(() => {
+const now = Date.now();
+const timeLeft = deadline - now;
+
+if (timeLeft > 0) {
+const hoursLeft = Math.floor(timeLeft / (1000 * 60 * 60));
+const minutesLeft = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+const secondsLeft = Math.floor((timeLeft % (1000 * 60)) / 1000);
+
+displayEl.innerText = `${String(hoursLeft).padStart(2,'0')}:${String(minutesLeft).padStart(2,'0')}:${String(secondsLeft).padStart(2,'0')}`;
+displayEl.style.color = "var(--timer-color)";
+} else {
+displayEl.innerText = "TIME'S UP! RESOLVING...";
+displayEl.style.color = "var(--text-accent)";
+clearInterval(countdownTimer);
+
+if(currentGroupData.challengeStatus === 'active') {
+resolveChallengeAndKick();
+}
+}
+}, 1000);
+}
+
+document.getElementById('btn-save-admin').addEventListener('click', async () => {
+const newMax = parseInt(document.getElementById('max-members-input').value) || 10;
+let newHours = parseInt(document.getElementById('challenge-hours-input').value);
+let newMins = parseInt(document.getElementById('challenge-mins-input').value);
+const adminOnly = document.getElementById('admin-invite-checkbox').checked;
+const publicVoting = document.getElementById('public-voting-checkbox').checked;
+
+if (isNaN(newHours)) newHours = 0;
+if (isNaN(newMins)) newMins = 0;
+
+if (newHours === 0 && newMins === 0) {
+newHours = 24; 
+}
+
+if(newMax < currentGroupData.members.length) {
+alert("Maximum member count cannot be less than the current member count. Kick some members first.");
+return;
+}
+
+document.getElementById('btn-save-admin').innerText = "...";
+await updateDoc(doc(db, "groups", currentGroupId), {
+maxMembers: newMax,
+challengeDurationHours: newHours,
+challengeDurationMins: newMins,
+adminOnlyInvites: adminOnly,
+publicVotingEnabled: publicVoting
+});
+document.getElementById('btn-save-admin').innerText = "Save Settings";
+refreshGroupData();
+});
+
+document.getElementById('btn-reroll').addEventListener('click', async () => {
+if(currentGroupData.challengeStatus === 'active' && !confirm("The challenge is still active. Are you sure you want to reroll early?")) {
+return;
+}
+
+document.getElementById('btn-reroll').innerText = "Drafting...";
+
+let history = currentGroupData.challengeHistory || [];
+let hIndex = currentGroupData.historyIndex || 0;
+
+if (currentGroupData.challengeStatus !== 'pending') {
+const historyItem = {
+challenge: currentGroupData.currentChallenge,
+leaderboard: currentGroupData.leaderboard || {},
+timestamp: Date.now()
+};
+
+if (history.length < 5) {
+history.push(historyItem);
+} else {
+history[hIndex] = historyItem;
+}
+hIndex = (hIndex + 1) % 5;
+}
+
+const newLeaderboard = {};
+currentGroupData.members.forEach(m => newLeaderboard[m] = 0);
+
+// Pull from the group's selected category. If somehow missing, fall back to first.
+const activeCatId = currentGroupData.currentCategoryId || challengeData.categories[0].id;
+const randomTask = getRandomChallengeFromCategory(activeCatId);
+
+await updateDoc(doc(db, "groups", currentGroupId), {
+challengeHistory: history,
+historyIndex: hIndex,
+leaderboard: newLeaderboard,
+currentChallenge: randomTask,
+challengeStartTime: null, 
+challengeStatus: 'pending', 
+submissions: {} 
+});
+
+document.getElementById('btn-reroll').innerText = "Reroll & Draft New Round";
+refreshGroupData();
+});
+
+window.kickMember = async function(targetName) {
+if (currentGroupData.challengeStatus === 'resolved') {
+return alert("You cannot kick members after the round is over!");
+}
+if(!confirm(`Are you sure you want to kick ${targetName}?`)) return;
+const updatedMembers = currentGroupData.members.filter(m => m !== targetName);
+await updateDoc(doc(db, "groups", currentGroupId), {
+members: updatedMembers
+});
+refreshGroupData();
+}
+
+document.getElementById('btn-copy-invite').addEventListener('click', () => {
+const baseUrl = window.location.origin + window.location.pathname;
+const inviteUrl = `${baseUrl}?groupId=${currentGroupId}`;
+navigator.clipboard.writeText(inviteUrl).then(() => {
+alert("Link copied!\nSend it to the group via WhatsApp: " + inviteUrl);
+});
+});
+
+document.getElementById('btn-copy-public-vote').addEventListener('click', () => {
+const baseUrl = window.location.origin + window.location.pathname;
+const publicUrl = `${baseUrl}?publicVoteId=${currentGroupId}`;
+navigator.clipboard.writeText(publicUrl).then(() => {
+alert("Public vote link copied!\nAnyone with this link can vote anonymously:\n" + publicUrl);
+});
+});
+
+// ============================================================
+// CATEGORY PICKER — admin selects which pool reroll draws from
+// ============================================================
+document.getElementById('btn-pick-category').addEventListener('click', () => {
+openCategoryOverlay();
+});
+
+window.openCategoryOverlay = function() {
+const overlay = document.getElementById('category-overlay');
+const list = document.getElementById('category-list-container');
+list.innerHTML = "";
+
+const currentId = currentGroupData?.currentCategoryId || challengeData.categories[0].id;
+
+challengeData.categories.forEach(cat => {
+const card = document.createElement('div');
+card.className = "category-card" + (cat.id === currentId ? " selected" : "");
+card.onclick = () => selectCategory(cat.id);
+
+const count = (cat.challenges || []).length;
+card.innerHTML = `
+                   <div class="cat-header">
+                       <span class="cat-emoji">${cat.emoji || '🎲'}</span>
+                       <span>${cat.name}</span>
+                       ${cat.id === currentId ? '<span style="margin-left:auto; color:var(--text-main); font-size:11px;">CURRENT</span>' : ''}
+                   </div>
+                   ${cat.description ? `<div class="cat-desc">${cat.description}</div>` : ''}
+                   <div class="cat-count">${count} challenge${count === 1 ? '' : 's'}</div>
+               `;
+list.appendChild(card);
+});
+
+// Tiny note if user is on fallback data (network issue)
+if (!challengeDataLoaded) {
+const note = document.createElement('p');
+note.style.cssText = "font-size:11px; color:#ff9900; margin-top:10px; text-align:center;";
+note.innerText = "⚠️ Using fallback list. challenges.json didn't load.";
+list.appendChild(note);
+}
+
+overlay.classList.add('active');
+}
+
+window.closeCategoryOverlay = function() {
+document.getElementById('category-overlay').classList.remove('active');
+}
+
+window.selectCategory = async function(categoryId) {
+if (!currentGroupId || !currentGroupData) return;
+if (currentGroupData.currentCategoryId === categoryId) {
+closeCategoryOverlay();
+return;
+}
+// Persist the choice. Doesn't change the *current* challenge — only future rerolls.
+await updateDoc(doc(db, "groups", currentGroupId), {
+currentCategoryId: categoryId
+});
+closeCategoryOverlay();
+refreshGroupData();
+}
+
+window.switchUser = function() {
+if(confirm("Are you sure you want to switch users?")) {
+localStorage.removeItem("daredrop_username");
+location.reload(); 
+}
+}
+
+window.showHistory = function() {
+showScreen('screen-history');
+const container = document.getElementById('history-list-container');
+container.innerHTML = "";
+
+const history = currentGroupData.challengeHistory || [];
+if (history.length === 0) {
+container.innerHTML = "<p style='color:#888; font-size:12px; text-align:center;'>No past challenges yet. Survive a round first!</p>";
+return;
+}
+
+const sortedHistory = [...history].sort((a, b) => b.timestamp - a.timestamp);
+
+sortedHistory.forEach((item, index) => {
+let card = document.createElement('div');
+card.className = "card";
+card.style.borderColor = "var(--timer-color)";
+
+let dateStr = new Date(item.timestamp).toLocaleString();
+
+let lbHtml = "";
+let players = Object.keys(item.leaderboard).sort((a, b) => item.leaderboard[b] - item.leaderboard[a]);
+players.forEach(p => {
+lbHtml += `<li style="font-size:12px; display:flex; justify-content:space-between; border-bottom:1px dashed #333; padding:4px 0;"><span>${p}</span> <strong>${item.leaderboard[p]} XP</strong></li>`;
+});
+
+card.innerHTML = `
+                   <h4 style="margin:0 0 10px 0; color:var(--text-main); font-size:12px;">RECORD <span style="float:right; color:#888;">${dateStr}</span></h4>
+                   <p style="font-size:14px; margin-bottom:10px;">"${item.challenge}"</p>
+                   <ul style="list-style:none; padding:0; margin:0;">${lbHtml}</ul>
+               `;
+container.appendChild(card);
+});
+}
+
+// ============================================================
+// PUBLIC VOTE FLOW — anonymous voting via shareable link
+// ============================================================
+
+window.loadPublicVotePage = async function(groupId) {
+publicVoteGroupId = groupId;
+showScreen('screen-public-vote');
+
+const container = document.getElementById('pv-submissions-container');
+container.innerHTML = "<p style='color:#888; text-align:center; font-size:13px;'>Loading...</p>";
+
+const docSnap = await getDoc(doc(db, "groups", groupId));
+if (!docSnap.exists()) {
+container.innerHTML = "<p style='color:var(--text-accent); text-align:center;'>This group no longer exists.</p>";
+return;
+}
+
+publicVoteGroupData = docSnap.data();
+
+// If admin disabled public voting, show a polite block.
+if (!publicVoteGroupData.publicVotingEnabled) {
+document.getElementById('pv-banner-text').innerText = "> PUBLIC VOTING IS NOT ENABLED FOR THIS GROUP";
+document.getElementById('pv-status-banner').style.borderColor = '#888';
+container.innerHTML = "<p style='color:#888; text-align:center; font-size:13px; padding:20px;'>The group admin hasn't turned on public voting. Ask them to enable it.</p>";
+renderPublicVoteHeader();
+return;
+}
+
+renderPublicVoteHeader();
+renderPublicVoteSubmissions();
+startPublicVoteCountdown();
+}
+
+function renderPublicVoteHeader() {
+document.getElementById('pv-group-name').innerText = publicVoteGroupData.name || "—";
+document.getElementById('pv-challenge-text').innerText = '"' + (publicVoteGroupData.currentChallenge || "—") + '"';
+}
+
+function renderPublicVoteSubmissions() {
+const container = document.getElementById('pv-submissions-container');
+container.innerHTML = "";
+
+const status = publicVoteGroupData.challengeStatus || 'pending';
+const submissions = publicVoteGroupData.submissions || {};
+const submitterNames = Object.keys(submissions);
+
+if (status === 'pending') {
+container.innerHTML = "<p style='color:#888; text-align:center; font-size:13px; padding:20px;'>The round hasn't started yet. Check back soon.</p>";
+return;
+}
+if (status === 'resolved') {
+container.innerHTML = "<p style='color:#888; text-align:center; font-size:13px; padding:20px;'>This round is over. Voting is closed.</p>";
+return;
+}
+if (submitterNames.length === 0) {
+container.innerHTML = "<p style='color:#888; text-align:center; font-size:13px; padding:20px;'>No one has submitted proof yet. Check back soon.</p>";
+return;
+}
+
+const myVoterId = getPublicVoterId();
+
+submitterNames.forEach(name => {
+const sub = submissions[name];
+const publicVotes = sub.publicVotes || {};
+const myExistingVote = publicVotes[myVoterId];
+const embedHtml = getEmbedHtml(sub.link);
+const proofDisplay = embedHtml
+? `${embedHtml}<p style="font-size:11px; color:#888; margin:5px 0 0; text-align:right;"><a href="${sub.link}" target="_blank" style="color:#888;">↗ Open original</a></p>`
+: `<p style="margin:5px 0; font-size:12px; color:#ff9900; padding:8px; border:1px dashed #555;">⚠️ This link can't be embedded. <a href="${sub.link}" target="_blank" style="color:var(--timer-color);">Click to open</a></p>`;
+
+const card = document.createElement('div');
+card.className = "card";
+card.style.borderColor = "#333";
+
+let voteSection = "";
+if (myExistingVote !== undefined) {
+voteSection = `<p style="font-size:12px; color:var(--text-main); margin:10px 0 0; text-align:center;">✓ You awarded ${myExistingVote} XP to ${name}.</p>`;
+} else {
+voteSection = `
+                       <div data-pv-target="${name}" style="display:flex; gap:5px; flex-wrap: wrap; margin-top: 10px;">
+                           <button class="btn" style="padding:5px; margin:0; font-size:10px; flex:1;" onclick="castPublicVote('${name.replace(/'/g, "\\'")}', 50)">Legendary (50)</button>
+                           <button class="btn" style="padding:5px; margin:0; font-size:10px; flex:1;" onclick="castPublicVote('${name.replace(/'/g, "\\'")}', 30)">Did it (30)</button>
+                           <button class="btn" style="padding:5px; margin:0; font-size:10px; flex:1;" onclick="castPublicVote('${name.replace(/'/g, "\\'")}', 10)">Weak (10)</button>
+                           <button class="btn" style="padding:5px; margin:0; font-size:10px; flex:1; border-color:#ff0000; color:#ff0000;" onclick="castPublicVote('${name.replace(/'/g, "\\'")}', 0)">Sus (0)</button>
+                       </div>
+                   `;
+}
+
+card.innerHTML = `
+                   <p style="margin:0 0 10px; font-size:14px;"><strong>${name}</strong></p>
+                   ${proofDisplay}
+                   ${voteSection}
+               `;
+container.appendChild(card);
+});
+}
+
+window.castPublicVote = async function(targetUser, points) {
+if (!publicVoteGroupData || !publicVoteGroupData.publicVotingEnabled) {
+return alert("Public voting isn't enabled.");
+}
+if ((publicVoteGroupData.challengeStatus || 'pending') !== 'active') {
+return alert("Voting isn't open right now.");
+}
+
+const voterId = getPublicVoterId();
+const submissions = publicVoteGroupData.submissions || {};
+const targetSub = submissions[targetUser];
+if (!targetSub) return alert("That submission no longer exists.");
+
+const existingVotes = targetSub.publicVotes || {};
+if (existingVotes[voterId] !== undefined) {
+return alert("You already voted on this submission. One vote per submission.");
+}
+
+// Write the vote AND bump leaderboard atomically.
+// Anonymous voter ID is the key — name/identity never stored.
+try {
+await updateDoc(doc(db, "groups", publicVoteGroupId), {
+[`submissions.${targetUser}.publicVotes.${voterId}`]: points,
+[`leaderboard.${targetUser}`]: increment(points)
+});
+} catch (e) {
+return alert("Vote failed: " + e.message);
+}
+
+// Bump cumulative global XP (same as member voting — public votes count too).
+try {
+await updateDoc(doc(db, "users", targetUser.toLowerCase()), {
+totalXp: increment(points)
+});
+} catch (e) {
+console.warn("Couldn't bump global totalXp for", targetUser, e.message);
+}
+
+// Optimistic local update so re-render shows the cast vote.
+if (!publicVoteGroupData.submissions[targetUser].publicVotes) {
+publicVoteGroupData.submissions[targetUser].publicVotes = {};
+}
+publicVoteGroupData.submissions[targetUser].publicVotes[voterId] = points;
+
+renderPublicVoteSubmissions();
+
+// Show join CTA after first vote — we want them on the platform.
+document.getElementById('pv-join-cta').style.display = 'block';
+document.getElementById('pv-join-cta').scrollIntoView({behavior: 'smooth', block: 'center'});
+}
+
+window.publicVoterJoinSite = function() {
+// Drop the publicVoteId param and go to the clean homepage so they can sign up.
+window.location.href = window.location.origin + window.location.pathname;
+}
+
+function startPublicVoteCountdown() {
+if (publicVoteCountdownTimer) clearInterval(publicVoteCountdownTimer);
+const displayEl = document.getElementById('pv-time-remaining');
+
+if ((publicVoteGroupData.challengeStatus || 'pending') !== 'active' || !publicVoteGroupData.challengeStartTime) {
+displayEl.innerText = "—";
+return;
+}
+
+const startTime = publicVoteGroupData.challengeStartTime;
+const durationHours = publicVoteGroupData.challengeDurationHours !== undefined ? publicVoteGroupData.challengeDurationHours : 24;
+const durationMins = publicVoteGroupData.challengeDurationMins || 0;
+const totalMs = (durationHours * 60 * 60 * 1000) + (durationMins * 60 * 1000);
+const deadline = startTime + totalMs;
+
+publicVoteCountdownTimer = setInterval(() => {
+const timeLeft = deadline - Date.now();
+if (timeLeft > 0) {
+const h = Math.floor(timeLeft / (1000 * 60 * 60));
+const m = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+const s = Math.floor((timeLeft % (1000 * 60)) / 1000);
+displayEl.innerText = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+} else {
+displayEl.innerText = "TIME'S UP";
+displayEl.style.color = "var(--text-accent)";
+clearInterval(publicVoteCountdownTimer);
+// Refresh once so the "round over" message kicks in for the public viewer.
+setTimeout(async () => {
+const snap = await getDoc(doc(db, "groups", publicVoteGroupId));
+if (snap.exists()) {
+publicVoteGroupData = snap.data();
+renderPublicVoteSubmissions();
+}
+}, 2000);
+}
+}, 1000);
+}
+
+// ============================================================
+// GLOBAL STATS — total XP + rank text on welcome screen.
+// Leaderboard list is lazy: only fetched when overlay opens.
+// ============================================================
+async function loadGlobalStats() {
+const xpEl = document.getElementById('user-total-xp');
+const rankDisplayEl = document.getElementById('rank-display');
+const rankNumEl = document.getElementById('rank-popup-num');
+
+const userTotal = (userData && userData.totalXp) || 0;
+xpEl.innerText = userTotal.toLocaleString();
+
+// No rank for users with 0 XP — would be misleading.
+if (userTotal <= 0) {
+rankDisplayEl.style.display = 'none';
+return;
+}
+
+try {
+// Cheap rank: count of users with strictly more XP, +1.
+// Single aggregation query — no document reads.
+const higherQuery = query(collection(db, "users"), where("totalXp", ">", userTotal));
+const countSnap = await getCountFromServer(higherQuery);
+const userRank = countSnap.data().count + 1;
+
+rankNumEl.innerText = userRank.toLocaleString();
+rankDisplayEl.style.display = 'none';
+// Animate in after a beat for emphasis — like the XP "lands" first, then rank.
+setTimeout(() => {
+rankDisplayEl.style.display = 'block';
+const txt = rankDisplayEl.querySelector('.rank-text');
+if (txt) {
+txt.style.animation = 'none';
+void txt.offsetWidth; // force reflow
+txt.style.animation = 'popIn 0.5s ease-out';
+}
+}, 500);
+} catch (e) {
+console.warn("Rank query failed:", e.message);
+rankDisplayEl.style.display = 'none';
+}
+}
+
+// Lazy-load leaderboard list on overlay open. Top 10 + user's row if outside it.
+async function loadGlobalLeaderboardList() {
+const listEl = document.getElementById('global-leaderboard-list');
+listEl.innerHTML = "<li style='color:#888; font-size:12px; justify-content:center;'>Loading...</li>";
+
+try {
+const userTotal = (userData && userData.totalXp) || 0;
+
+const topQuery = query(collection(db, "users"), orderBy("totalXp", "desc"), limit(10));
+const topSnap = await getDocs(topQuery);
+const topUsers = [];
+topSnap.forEach(d => {
+const data = d.data();
+topUsers.push({ name: data.name || d.id, totalXp: data.totalXp || 0 });
+});
+
+// User's rank — needed only if they're outside top 10.
+let userRank = null;
+if (userTotal > 0) {
+try {
+const higherQuery = query(collection(db, "users"), where("totalXp", ">", userTotal));
+const countSnap = await getCountFromServer(higherQuery);
+userRank = countSnap.data().count + 1;
+} catch (e) {
+const idx = topUsers.findIndex(u => u.name.toLowerCase() === currentUserName.toLowerCase());
+if (idx >= 0) userRank = idx + 1;
+}
+}
+
+listEl.innerHTML = "";
+if (topUsers.length === 0 || (topUsers[0].totalXp || 0) === 0) {
+listEl.innerHTML = "<li style='color:#888; font-size:12px; justify-content:center;'>No XP earned anywhere yet. Be the first.</li>";
+return;
+}
+
+let foundMe = false;
+topUsers.forEach((u, idx) => {
+if ((u.totalXp || 0) === 0) return; // skip zero-XP entries
+const isMe = u.name.toLowerCase() === currentUserName.toLowerCase();
+if (isMe) foundMe = true;
+const li = document.createElement('li');
+if (isMe) li.className = "global-lb-row is-me";
+li.innerHTML = `<span><span class="rank-num">#${idx+1}</span>${u.name}${isMe ? ' <span style="color:#888; font-size:10px;">(YOU)</span>' : ''}</span> <strong>${(u.totalXp || 0).toLocaleString()} XP</strong>`;
+listEl.appendChild(li);
+});
+
+if (!foundMe && userRank && userTotal > 0) {
+const sep = document.createElement('li');
+sep.style.cssText = "color: #444; padding: 4px 0; justify-content: center; border-bottom: none;";
+sep.innerText = "···";
+listEl.appendChild(sep);
+
+const myLi = document.createElement('li');
+myLi.className = "global-lb-row is-me";
+myLi.innerHTML = `<span><span class="rank-num">#${userRank}</span>${currentUserName} <span style="color:#888; font-size:10px;">(YOU)</span></span> <strong>${userTotal.toLocaleString()} XP</strong>`;
+listEl.appendChild(myLi);
+}
+} catch (e) {
+console.error("loadGlobalLeaderboardList failed:", e);
+listEl.innerHTML = "<li style='color:#888; font-size:12px; justify-content:center;'>Couldn't load leaderboard.</li>";
+}
+}
+
+window.openGlobalLeaderboardOverlay = async function() {
+document.getElementById('global-leaderboard-overlay').classList.add('active');
+await loadGlobalLeaderboardList();
+}
+
+window.closeGlobalLeaderboardOverlay = function() {
+document.getElementById('global-leaderboard-overlay').classList.remove('active');
+}
+
+document.getElementById('btn-view-global-leaderboard').addEventListener('click', () => {
+window.openGlobalLeaderboardOverlay();
+});
+
+// ============================================================
+// SOUND — tiny synthesized blip on button clicks. No assets.
+// Toggleable, persisted in localStorage.
+// ============================================================
+// ============================================================
+// SOUND & GENERATIVE BGM
+// ============================================================
+let audioContext = null;
+let soundEnabled = localStorage.getItem("daredrop_sound") !== "off";
+let bgmMasterGain = null;
+let bgmStarted = false;
+
+function updateSoundIcon() {
+const btn = document.getElementById('sound-toggle');
+if (!btn) return;
+btn.innerText = soundEnabled ? '🔊' : '🔇';
+btn.classList.toggle('muted', !soundEnabled);
+btn.title = soundEnabled ? 'Sounds ON (click to mute)' : 'Sounds OFF (click to enable)';
+}
+
+function playClick() {
+if (!soundEnabled) return;
+try {
+if (!audioContext) {
+audioContext = new (window.AudioContext || window.webkitAudioContext)();
+}
+
+if (audioContext.state === 'suspended') {
+audioContext.resume();
+}
+
+const now = audioContext.currentTime;
+const pitchVar = 0.9 + Math.random() * 0.2;
+
+const delay = audioContext.createDelay();
+delay.delayTime.value = 0.015; 
+const feedback = audioContext.createGain();
+feedback.gain.value = 0.10; 
+delay.connect(feedback);
+feedback.connect(delay);
+delay.connect(audioContext.destination);
+
+const oscBody = audioContext.createOscillator();
+const gainBody = audioContext.createGain();
+oscBody.type = 'sine';
+
+oscBody.frequency.setValueAtTime(250 * pitchVar, now);
+oscBody.frequency.exponentialRampToValueAtTime(40 * pitchVar, now + 0.04);
+
+gainBody.gain.setValueAtTime(0, now);
+gainBody.gain.linearRampToValueAtTime(0.7, now + 0.001); 
+gainBody.gain.exponentialRampToValueAtTime(0.001, now + 0.04); 
+
+oscBody.connect(gainBody);
+gainBody.connect(audioContext.destination); 
+gainBody.connect(delay); 
+
+const oscClick = audioContext.createOscillator();
+const gainClick = audioContext.createGain();
+oscClick.type = 'square'; 
+
+oscClick.frequency.setValueAtTime(800 * pitchVar, now);
+oscClick.frequency.exponentialRampToValueAtTime(100 * pitchVar, now + 0.015);
+
+gainClick.gain.setValueAtTime(0, now);
+gainClick.gain.linearRampToValueAtTime(0.12, now + 0.001);
+gainClick.gain.exponentialRampToValueAtTime(0.001, now + 0.015);
+
+oscClick.connect(gainClick);
+gainClick.connect(audioContext.destination);
+
+oscBody.start(now); oscBody.stop(now + 0.05);
+oscClick.start(now); oscClick.stop(now + 0.02);
+
+} catch (e) {}
+}
+
+// JENERATİF MÜZİK MOTORU
+function initGenerativeMusic() {
+if (bgmStarted) return;
+bgmStarted = true;
+
+if (!audioContext) {
+audioContext = new (window.AudioContext || window.webkitAudioContext)();
+}
+
+if (audioContext.state === 'suspended') {
+audioContext.resume();
+}
+
+bgmMasterGain = audioContext.createGain();
+// Eski değer 0.15 idi, 0.35 yaparak sesi belirgin şekilde artırdık
+bgmMasterGain.gain.value = soundEnabled ? 0.35 : 0; 
+bgmMasterGain.connect(audioContext.destination);
+
+const delay = audioContext.createDelay();
+delay.delayTime.value = 0.45; 
+const feedback = audioContext.createGain();
+feedback.gain.value = 0.5;
+
+const lowpass = audioContext.createBiquadFilter();
+lowpass.type = 'lowpass';
+lowpass.frequency.value = 800; 
+
+delay.connect(feedback);
+feedback.connect(delay);
+delay.connect(lowpass);
+lowpass.connect(bgmMasterGain);
+
+const scale = [130.81, 155.56, 174.61, 196.00, 233.08, 261.63, 311.13];
+let nextNoteTime = audioContext.currentTime + 0.1;
+
+function schedule() {
+if (audioContext.state === 'suspended') {
+requestAnimationFrame(schedule);
+return;
+}
+
+if (nextNoteTime < audioContext.currentTime) {
+nextNoteTime = audioContext.currentTime + 0.1;
+}
+
+while (nextNoteTime < audioContext.currentTime + 0.15) {
+playStochasticNote(nextNoteTime);
+const step = Math.random() > 0.6 ? 0.25 : 0.5; 
+nextNoteTime += step;
+}
+requestAnimationFrame(schedule);
+}
+
+function playStochasticNote(time) {
+if (Math.random() > 0.3) return;
+
+const osc = audioContext.createOscillator();
+const noteGain = audioContext.createGain();
+
+const freq = scale[Math.floor(Math.random() * scale.length)];
+
+osc.detune.value = (Math.random() - 0.5) * 15; 
+osc.type = Math.random() > 0.5 ? 'sine' : 'triangle';
+osc.frequency.setValueAtTime(freq, time);
+
+noteGain.gain.setValueAtTime(0, time);
+// Eski değer 0.08 idi, 0.18 yaparak her notanın kendi vuruşunu güçlendirdik
+noteGain.gain.linearRampToValueAtTime(0.18, time + 0.2); 
+noteGain.gain.exponentialRampToValueAtTime(0.001, time + 1.5); 
+
+osc.connect(noteGain);
+noteGain.connect(bgmMasterGain); 
+noteGain.connect(delay); 
+
+osc.start(time);
+osc.stop(time + 1.6);
+}
+
+schedule();
+}
+
+window.toggleSound = function() {
+soundEnabled = !soundEnabled;
+localStorage.setItem("daredrop_sound", soundEnabled ? "on" : "off");
+updateSoundIcon();
+
+if (bgmMasterGain) {
+const now = audioContext ? audioContext.currentTime : 0;
+bgmMasterGain.gain.cancelScheduledValues(now);
+if (soundEnabled) {
+if (audioContext.state === 'suspended') audioContext.resume();
+// Fade in hedefi 0.35 olarak güncellendi
+bgmMasterGain.gain.linearRampToValueAtTime(0.35, now + 0.5);
+} else {
+bgmMasterGain.gain.linearRampToValueAtTime(0, now + 0.5);
+}
+}
+
+if (soundEnabled) playClick();
+}
+
+document.addEventListener('click', (e) => {
+if (!bgmStarted) {
+initGenerativeMusic();
+}
+
+if (e.target.closest('.btn, .kick-btn, .group-delete-btn, .category-card, .category-current-pill, #sound-toggle, button')) {
+playClick();
+}
+});
+
+updateSoundIcon();
+</script>
+<!-- Generatif arka plan scriptini buraya ekliyoruz -->
+<script src="generative-bg.js"></script>
+<!-- Zafer Efekti ve Chime Scripti -->
    <!-- Zafer Efekti, Chime ve Özet Pop-up Scripti -->
-    <script>
-    (function() {
-        let fireworksFired = false;
+<script>
+(function() {
+let fireworksFired = false;
 
-        function playVictoryChime() {
-            const isMuted = localStorage.getItem("daredrop_sound") === "off";
-            if (isMuted) return;
+function playVictoryChime() {
+            // Kullanıcı sesi kapattıysa çalma
+const isMuted = localStorage.getItem("daredrop_sound") === "off";
+if (isMuted) return;
 
-            try {
-                let ctx = window.audioContext || new (window.AudioContext || window.webkitAudioContext)();
-                if (ctx.state === 'suspended') ctx.resume();
+try {
+let ctx = window.audioContext || new (window.AudioContext || window.webkitAudioContext)();
+if (ctx.state === 'suspended') ctx.resume();
 
-                const now = ctx.currentTime;
-                // Retro zafer arpeji (C5, E5, G5, C6)
-                const notes = [523.25, 659.25, 783.99, 1046.50];
+const now = ctx.currentTime;
+// Retro zafer arpeji (C5, E5, G5, C6)
+const notes = [523.25, 659.25, 783.99, 1046.50];
 
-                notes.forEach((freq, i) => {
-                    const osc = ctx.createOscillator();
-                    const gain = ctx.createGain();
-                    
-                    osc.type = 'square';
-                    osc.frequency.value = freq;
-                    
+notes.forEach((freq, i) => {
+const osc = ctx.createOscillator();
+const gain = ctx.createGain();
+
+osc.type = 'square';
+osc.frequency.value = freq;
+
+                    const t = now + (i * 0.12); // Notalar arası hızlı geçiş
                     const t = now + (i * 0.12);
-                    
-                    gain.gain.setValueAtTime(0, t);
-                    gain.gain.linearRampToValueAtTime(0.15, t + 0.02);
-                    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
-                    
-                    osc.connect(gain);
-                    gain.connect(ctx.destination);
-                    
-                    osc.start(t);
-                    osc.stop(t + 0.45);
-                });
-            } catch (e) {}
-        }
+
+gain.gain.setValueAtTime(0, t);
+gain.gain.linearRampToValueAtTime(0.15, t + 0.02);
+gain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+
+osc.connect(gain);
+gain.connect(ctx.destination);
+
+osc.start(t);
+osc.stop(t + 0.45);
+});
+} catch (e) {}
+}
 
         function showLeaderboardPopup() {
             // Önceki modal varsa temizle
@@ -1864,93 +1894,104 @@
             });
         }
 
-        function triggerFireworks() {
-            const canvas = document.createElement('canvas');
-            canvas.style.position = 'fixed';
-            canvas.style.top = '0';
-            canvas.style.left = '0';
-            canvas.style.width = '100vw';
-            canvas.style.height = '100vh';
+function triggerFireworks() {
+const canvas = document.createElement('canvas');
+canvas.style.position = 'fixed';
+canvas.style.top = '0';
+canvas.style.left = '0';
+canvas.style.width = '100vw';
+canvas.style.height = '100vh';
+            canvas.style.zIndex = '9999'; // Her şeyin üstünde
             canvas.style.zIndex = '9999'; 
-            canvas.style.pointerEvents = 'none';
+canvas.style.pointerEvents = 'none';
+            canvas.style.imageRendering = 'pixelated'; // Retro görünüm
             canvas.style.imageRendering = 'pixelated'; 
-            document.body.appendChild(canvas);
-            
-            const ctx = canvas.getContext('2d');
-            canvas.width = window.innerWidth / 4;
-            canvas.height = window.innerHeight / 4;
-            
-            const particles = [];
-            const colors = ['#33ff00', '#ff0055', '#00e5ff', '#ffaa00']; 
-            const cx = canvas.width / 2;
-            const cy = canvas.height / 2.5;
-            
-            for(let i=0; i < 70; i++) {
-                const angle = Math.random() * Math.PI * 2;
-                const speed = 1 + Math.random() * 4.5;
-                particles.push({
-                    x: cx,
-                    y: cy,
-                    vx: Math.cos(angle) * speed,
-                    vy: Math.sin(angle) * speed,
-                    color: colors[Math.floor(Math.random() * colors.length)],
-                    life: 1.0,
-                    decay: 0.01 + Math.random() * 0.02
-                });
-            }
-            
-            function render() {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                let alive = false;
-                
-                particles.forEach(p => {
-                    if(p.life > 0) {
-                        alive = true;
-                        p.x += p.vx;
-                        p.y += p.vy;
+document.body.appendChild(canvas);
+
+const ctx = canvas.getContext('2d');
+            // Düşük çözünürlük ile maksimum performans
+canvas.width = window.innerWidth / 4;
+canvas.height = window.innerHeight / 4;
+
+const particles = [];
+            // Sitenin tema renkleri: Neon Yeşil, Aksan Kırmızı, Timer Mavi, Admin Turuncu
+const colors = ['#33ff00', '#ff0055', '#00e5ff', '#ffaa00']; 
+const cx = canvas.width / 2;
+const cy = canvas.height / 2.5;
+
+for(let i=0; i < 70; i++) {
+const angle = Math.random() * Math.PI * 2;
+const speed = 1 + Math.random() * 4.5;
+particles.push({
+x: cx,
+y: cy,
+vx: Math.cos(angle) * speed,
+vy: Math.sin(angle) * speed,
+color: colors[Math.floor(Math.random() * colors.length)],
+life: 1.0,
+decay: 0.01 + Math.random() * 0.02
+});
+}
+
+function render() {
+ctx.clearRect(0, 0, canvas.width, canvas.height);
+let alive = false;
+
+particles.forEach(p => {
+if(p.life > 0) {
+alive = true;
+p.x += p.vx;
+p.y += p.vy;
+                        p.vy += 0.08; // Yerçekimi hissi
                         p.vy += 0.08; 
-                        p.life -= p.decay;
-                        
-                        ctx.fillStyle = p.color;
-                        ctx.globalAlpha = Math.max(0, p.life);
+p.life -= p.decay;
+
+ctx.fillStyle = p.color;
+ctx.globalAlpha = Math.max(0, p.life);
+                        ctx.fillRect(Math.floor(p.x), Math.floor(p.y), 2, 2); // İri pikseller
                         ctx.fillRect(Math.floor(p.x), Math.floor(p.y), 2, 2); 
-                    }
-                });
-                
-                if(alive) {
-                    requestAnimationFrame(render);
-                } else {
+}
+});
+
+if(alive) {
+requestAnimationFrame(render);
+} else {
+                    canvas.remove(); // İş bitince DOM'dan temizle
                     canvas.remove(); 
-                }
-            }
-            render();
-            playVictoryChime();
+}
+}
+render();
+playVictoryChime();
 
             // Havai fişekler sürerken 1.2 saniye sonra terminal pop-up'ını tetikle
             setTimeout(showLeaderboardPopup, 1200);
-        }
+}
 
-        const observer = new MutationObserver((mutations) => {
-            mutations.forEach((mutation) => {
-                const text = mutation.target.innerText || "";
-                if (text.includes("ROUND OVER!")) {
-                    if (!fireworksFired) {
-                        triggerFireworks();
-                        fireworksFired = true;
-                    }
-                } else if (text.includes("WAITING FOR ADMIN") || text.includes("THE CHALLENGE")) {
-                    fireworksFired = false;
-                }
-            });
-        });
+        // Arayüzdeki "survival-status" elementini dinleyen gözlemci
+const observer = new MutationObserver((mutations) => {
+mutations.forEach((mutation) => {
+const text = mutation.target.innerText || "";
+if (text.includes("ROUND OVER!")) {
+if (!fireworksFired) {
+triggerFireworks();
+fireworksFired = true;
+}
+} else if (text.includes("WAITING FOR ADMIN") || text.includes("THE CHALLENGE")) {
+                    // Yeni tur başladığında tetikleyiciyi sıfırla
+fireworksFired = false;
+}
+});
+});
 
-        window.addEventListener('load', () => {
-            const statusEl = document.getElementById('survival-status');
-            if (statusEl) {
-                observer.observe(statusEl, { childList: true, characterData: true, subtree: true });
-            }
-        });
-    })();
+        // Sayfa yüklendiğinde gözlemciyi başlat
+window.addEventListener('load', () => {
+const statusEl = document.getElementById('survival-status');
+if (statusEl) {
+observer.observe(statusEl, { childList: true, characterData: true, subtree: true });
+}
+});
+})();
+  </script>
     </script>
 </body>
 </html>
