@@ -542,6 +542,16 @@
                 }
             }
         }
+        // MUHTEMELEN SİLİNEN BUTON GÖREVİ BURASI
+        document.getElementById('btn-login').addEventListener('click', async () => {
+            const username = document.getElementById('username').value.trim();
+            if (!username) return alert("You must provide a name.");
+            
+            document.getElementById('btn-login').innerText = "Loading...";
+            await loadUserProfile(username);
+            document.getElementById('btn-login').innerText = "Login / Register";
+        });
+        
         document.getElementById('btn-create-group').addEventListener('click', async () => {
             const groupName = document.getElementById('new-group-name').value.trim();
             if(!groupName) return;
