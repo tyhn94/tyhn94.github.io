@@ -463,6 +463,54 @@
             }
         });
 
+        // PWA üzerinden gelen paylaşımları işleyen yeni fonksiyon
+        async function processSharedLink(username) {
+            const urlParams = new URLSearchParams(window.location.search);
+            // Telefonlar bazen linki 'text' bazen de 'share_url' içine koyar
+            let sharedLink = urlParams.get('share_url') || urlParams.get('text');
+
+            if (!sharedLink) return false;
+
+            // Instagram/TikTok bazen "Şu videoya bak: https://..." şeklinde metin yollar.
+            // Sadece link kısmını ayıklamak için Regex kullanıyoruz.
+            const urlMatch = sharedLink.match(/(https?:\/\/[^\s]+)/);
+            if (urlMatch) {
+                sharedLink = urlMatch[0];
+            } else {
+                return false;
+            }
+
+            // Kullanıcının gruplarını tara
+            for (let i = 0; i < userData.groups.length; i++) {
+                const groupId = userData.groups[i].id;
+                const groupSnap = await getDoc(doc(db, "groups", groupId));
+                
+                if (groupSnap.exists()) {
+                    const gData = groupSnap.data();
+                    const status = gData.challengeStatus || 'active';
+                    const subs = gData.submissions || {};
+
+                    // Grup aktifse ve bu kullanıcı henüz link GÖNDERMEDİYSE
+                    if (status === 'active' && !subs[username]) {
+                        
+                        // Linki direkt veritabanına o grubun submission'ı olarak kaydet
+                        await updateDoc(doc(db, "groups", groupId), {
+                            [`submissions.${username}`]: { link: sharedLink, votes: {} }
+                        });
+
+                        // URL'yi temizle (kullanıcı sayfayı yenilerse tekrar göndermesin diye)
+                        window.history.replaceState(null, "", window.location.pathname);
+
+                        // Kullanıcıyı doğrudan o grubun içine fırlat
+                        openDashboard(groupId);
+                        return true; 
+                    }
+                }
+            }
+            return false; 
+        }
+
+        // Güncellenmiş loadUserProfile fonksiyonu
         async function loadUserProfile(username) {
             currentUserName = username;
             localStorage.setItem("daredrop_username", username);
@@ -472,7 +520,6 @@
             
             if (userDoc.exists()) {
                 userData = userDoc.data();
-                // Lazy migration for legacy users created before totalXp existed.
                 if (userData.totalXp === undefined) {
                     userData.totalXp = 0;
                     await updateDoc(doc(db, "users", userRefId), { totalXp: 0 });
@@ -482,105 +529,19 @@
                 await setDoc(doc(db, "users", userRefId), userData);
             }
 
-            if (inviteGroupId) {
-                await joinExistingGroup(inviteGroupId);
-                window.history.replaceState(null, "", window.location.pathname);
-            } else {
-                window.renderMyGroups();
-            }
-        }
-
-        document.getElementById('btn-login').addEventListener('click', async () => {
-            const username = document.getElementById('username').value.trim();
-            if (!username) return alert("You must provide a name.");
+            // Önce paylaşım linki var mı ona bakıyoruz
+            const handledShare = await processSharedLink(username);
             
-            document.getElementById('btn-login').innerText = "Loading...";
-            await loadUserProfile(username);
-            document.getElementById('btn-login').innerText = "Login / Register";
-        });
-
-        // REWRITTEN: Now checks database to apply admin tags and clean up deleted groups
-        window.renderMyGroups = async function() {
-            showScreen('screen-my-groups');
-            if (countdownTimer) clearInterval(countdownTimer); 
-            document.getElementById('display-username').innerText = userData.name;
-
-            // Kick off global stats in parallel — don't block group rendering on it.
-            loadGlobalStats();
-
-            const container = document.getElementById('group-list-container');
-            
-            if (!userData.groups || userData.groups.length === 0) {
-                container.innerHTML = "<p style='color:#888; font-size:12px;'>You are not a member of any group yet.</p>";
-                return;
-            }
-
-            container.innerHTML = "<p style='color:#888; font-size:12px; text-align:center;'>Loading groups...</p>";
-
-            const validGroups = [];
-            let needsDbUpdate = false;
-
-            container.innerHTML = ""; 
-
-            for (let i = 0; i < userData.groups.length; i++) {
-                const groupInfo = userData.groups[i];
-                const docSnap = await getDoc(doc(db, "groups", groupInfo.id));
-
-                if (!docSnap.exists()) {
-                    // Group was deleted by admin, flag for cleanup
-                    needsDbUpdate = true;
+            // Eğer paylaşım linki yoksa veya işlenemediyse normal akışa devam et
+            if (!handledShare) {
+                if (inviteGroupId) {
+                    await joinExistingGroup(inviteGroupId);
+                    window.history.replaceState(null, "", window.location.pathname);
                 } else {
-                    validGroups.push(groupInfo);
-                    const gData = docSnap.data();
-                    const isAdmin = gData.adminName === currentUserName;
-
-                    const row = document.createElement('div');
-                    row.className = "group-list-item";
-
-                    const btn = document.createElement('button');
-                    btn.className = "btn group-list-btn";
-                    btn.innerHTML = "> " + groupInfo.name + (isAdmin ? " <span style='color:var(--admin-color); font-size:10px; font-weight:bold;'>(ADMIN)</span>" : "");
-                    btn.onclick = () => openDashboard(groupInfo.id);
-                    row.appendChild(btn);
-
-                    // Add Delete button if Admin
-                    if (isAdmin) {
-                        const delBtn = document.createElement('button');
-                        delBtn.className = "group-delete-btn";
-                        delBtn.innerText = "X";
-                        delBtn.onclick = (e) => {
-                            e.stopPropagation(); 
-                            deleteGroupFromMenu(groupInfo.id);
-                        };
-                        row.appendChild(delBtn);
-                    }
-
-                    container.appendChild(row);
-                }
-            }
-
-            // If we found deleted groups, update the user profile in Firestore silently
-            if (needsDbUpdate) {
-                userData.groups = validGroups;
-                const userRefId = currentUserName.toLowerCase();
-                await updateDoc(doc(db, "users", userRefId), {
-                    groups: validGroups
-                });
-                if (validGroups.length === 0) {
-                    container.innerHTML = "<p style='color:#888; font-size:12px;'>You are not a member of any group yet.</p>";
+                    window.renderMyGroups();
                 }
             }
         }
-
-        // NEW: Delete from menu function
-        window.deleteGroupFromMenu = async function(groupId) {
-            if(confirm("Are you sure you want to PERMANENTLY delete this group? This action cannot be undone!")) {
-                await deleteDoc(doc(db, "groups", groupId));
-                // Simply re-rendering will automatically clean it out of the local view and database
-                window.renderMyGroups();
-            }
-        }
-
         document.getElementById('btn-create-group').addEventListener('click', async () => {
             const groupName = document.getElementById('new-group-name').value.trim();
             if(!groupName) return;
