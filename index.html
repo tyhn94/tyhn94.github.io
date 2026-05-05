@@ -1629,38 +1629,41 @@
                 }
                 const now = audioContext.currentTime;
                 
-                // Reverb (Yankı) hissi yaratmak için mikro delay ağı
+                // Pitch için rastgele bir çarpan (0.85 ile 1.15 arası).
+                // Bu değer her tıklamada farklı bir "nota" hissi verecek.
+                const pitchVar = 0.85 + Math.random() * 0.3;
+                
                 const delay = audioContext.createDelay();
-                delay.delayTime.value = 0.025; // 25ms oda yankısı
+                delay.delayTime.value = 0.025; 
                 const feedback = audioContext.createGain();
-                feedback.gain.value = 0.25; // Yankının sönümlenme miktarı
+                feedback.gain.value = 0.25; 
                 delay.connect(feedback);
                 feedback.connect(delay);
                 delay.connect(audioContext.destination);
 
-                // 1. Butonun "Tok" gövdesi (Yumuşak Sine dalgası)
                 const oscBody = audioContext.createOscillator();
                 const gainBody = audioContext.createGain();
                 oscBody.type = 'sine';
-                // Frekans 600Hz'den 100Hz'e hızla düşerek tokluk hissi verir
-                oscBody.frequency.setValueAtTime(600, now);
-                oscBody.frequency.exponentialRampToValueAtTime(100, now + 0.05);
+                
+                // Frekansları pitchVar katsayısı ile çarpıyoruz
+                oscBody.frequency.setValueAtTime(600 * pitchVar, now);
+                oscBody.frequency.exponentialRampToValueAtTime(100 * pitchVar, now + 0.05);
                 
                 gainBody.gain.setValueAtTime(0, now);
                 gainBody.gain.linearRampToValueAtTime(0.4, now + 0.002);
                 gainBody.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
                 
                 oscBody.connect(gainBody);
-                gainBody.connect(audioContext.destination); // Sesi doğrudan ver
-                gainBody.connect(delay); // Aynı zamanda reverb ağına gönder
+                gainBody.connect(audioContext.destination); 
+                gainBody.connect(delay); 
 
-                // 2. Butonun "Çıtır" tıklama hissi (Kısa Triangle dalgası)
                 const oscClick = audioContext.createOscillator();
                 const gainClick = audioContext.createGain();
                 oscClick.type = 'triangle';
-                // Yüksek frekanstan orta frekansa çok ani düşüş (Click/Pluck)
-                oscClick.frequency.setValueAtTime(3000, now);
-                oscClick.frequency.exponentialRampToValueAtTime(500, now + 0.02);
+                
+                // Click frekanslarını da aynı pitchVar ile çarpıyoruz
+                oscClick.frequency.setValueAtTime(3000 * pitchVar, now);
+                oscClick.frequency.exponentialRampToValueAtTime(500 * pitchVar, now + 0.02);
                 
                 gainClick.gain.setValueAtTime(0, now);
                 gainClick.gain.linearRampToValueAtTime(0.15, now + 0.001);
@@ -1670,7 +1673,6 @@
                 gainClick.connect(audioContext.destination);
                 gainClick.connect(delay);
 
-                // Düğümleri başlat ve bitir
                 oscBody.start(now); oscBody.stop(now + 0.06);
                 oscClick.start(now); oscClick.stop(now + 0.03);
                 
@@ -1678,7 +1680,6 @@
                 // AudioContext hatalarını sessizce yoksay
             }
         }
-
         window.toggleSound = function() {
             soundEnabled = !soundEnabled;
             localStorage.setItem("daredrop_sound", soundEnabled ? "on" : "off");
