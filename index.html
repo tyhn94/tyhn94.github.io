@@ -353,13 +353,13 @@
 
             <div id="invite-section" class="card" style="border-color: var(--text-accent); text-align: center;">
                 <p style="margin-top: 0; font-size: 14px;">> GATHER THE SQUAD</p>
-                <button class="btn btn-accent" id="btn-copy-invite">Copy Invite Link</button>
+                <button class="btn btn-accent" id="btn-copy-invite">📤 Share Invite</button>
             </div>
 
             <div id="public-vote-status" class="card" style="display: none; border-color: #ff66cc; text-align: center;">
                 <p style="margin-top: 0; font-size: 14px; color: #ff66cc;">> PUBLIC VOTING <span id="pv-status-label">OFF</span></p>
                 <p id="pv-status-desc" style="font-size: 11px; color: #888; margin: 5px 0 10px;"></p>
-                <button class="btn" id="btn-copy-public-vote" style="border-color: #ff66cc; color: #ff66cc; display:none;">Copy Public Vote Link</button>
+                <button class="btn" id="btn-copy-public-vote" style="border-color: #ff66cc; color: #ff66cc; display:none;">📤 Share Public Vote Link</button>
             </div>
 
             <div class="card">
@@ -977,8 +977,11 @@
 
                 if (!hasSubmitted) {
                     interactionDiv.innerHTML = `
-                        <input type="text" id="proof-link-input" placeholder="Paste your story/post link here...">
-                        <button class="btn btn-accent" onclick="submitProof()">Submit Proof</button>
+                        <div style="display: flex; gap: 5px; margin-bottom: 8px;">
+                            <input type="url" inputmode="url" autocomplete="off" id="proof-link-input" placeholder="Paste your link here..." style="flex: 1; margin: 0;">
+                            <button type="button" class="btn" onclick="pasteFromClipboard()" title="Paste from clipboard" style="margin: 0; padding: 8px 12px; min-width: 50px; flex-shrink: 0;">📋</button>
+                        </div>
+                        <button class="btn btn-accent" onclick="submitProof()" style="margin-top: 0;">Submit Proof</button>
                     `;
                 } else {
                     // Show submitter their own proof first
@@ -1129,6 +1132,32 @@
 
             return null;
         }
+
+        // One-tap paste for the submission input. Reads clipboard via the modern API,
+        // which most browsers grant inside a click handler (user gesture). On failure
+        // (permission denied, insecure context, older browser), focus the input so the
+        // user can long-press → paste manually — graceful degradation, not an alert.
+        window.pasteFromClipboard = async function() {
+            const input = document.getElementById('proof-link-input');
+            if (!input) return;
+            try {
+                const text = await navigator.clipboard.readText();
+                if (text) {
+                    input.value = text.trim();
+                    input.focus();
+                    // Tiny visual confirmation by briefly flashing the border.
+                    input.style.transition = 'border-color 0.3s';
+                    const original = input.style.borderColor;
+                    input.style.borderColor = 'var(--text-accent)';
+                    setTimeout(() => { input.style.borderColor = original; }, 600);
+                } else {
+                    input.focus();
+                }
+            } catch (e) {
+                // Permission denied or unsupported — just focus so the user can paste manually.
+                input.focus();
+            }
+        };
 
         window.submitProof = async function() {
             const linkInput = document.getElementById('proof-link-input').value.trim();
@@ -1542,19 +1571,60 @@
             refreshGroupData();
         }
 
-        document.getElementById('btn-copy-invite').addEventListener('click', () => {
+        // Generic share helper — uses native OS share sheet when available (one tap to
+        // WhatsApp / Messages / Telegram on mobile), falls back to clipboard otherwise.
+        // Resolves silently on user-cancel so callers don't show an error toast for that.
+        async function shareOrCopy({ title, text, url, copyMessage, btnEl }) {
+            const originalLabel = btnEl ? btnEl.innerText : null;
+            try {
+                if (navigator.share) {
+                    await navigator.share({ title, text, url });
+                    return; // Native sheet handled it.
+                }
+            } catch (err) {
+                // AbortError = user dismissed the share sheet. Stay silent.
+                if (err && err.name === 'AbortError') return;
+                // Other errors fall through to clipboard.
+                console.warn('[share] native share failed, falling back to clipboard:', err);
+            }
+
+            // Fallback: clipboard + alert. Used on desktop browsers and older mobile.
+            try {
+                await navigator.clipboard.writeText(url);
+                if (btnEl) {
+                    btnEl.innerText = '✓ Copied — paste in your chat';
+                    setTimeout(() => { btnEl.innerText = originalLabel; }, 2200);
+                } else {
+                    alert(copyMessage + "\n" + url);
+                }
+            } catch (e) {
+                alert(copyMessage + "\n" + url);
+            }
+        }
+
+        document.getElementById('btn-copy-invite').addEventListener('click', (e) => {
             const baseUrl = window.location.origin + window.location.pathname;
             const inviteUrl = `${baseUrl}?groupId=${currentGroupId}`;
-            navigator.clipboard.writeText(inviteUrl).then(() => {
-                alert("Link copied!\nSend it to the group via WhatsApp: " + inviteUrl);
+            const groupName = (currentGroupData && currentGroupData.name) || "DareDrop";
+            shareOrCopy({
+                title: `Join ${groupName} on DareDrop`,
+                text: `You're invited to ${groupName} on DareDrop.`,
+                url: inviteUrl,
+                copyMessage: "Invite link copied!",
+                btnEl: e.currentTarget
             });
         });
 
-        document.getElementById('btn-copy-public-vote').addEventListener('click', () => {
+        document.getElementById('btn-copy-public-vote').addEventListener('click', (e) => {
             const baseUrl = window.location.origin + window.location.pathname;
             const publicUrl = `${baseUrl}?publicVoteId=${currentGroupId}`;
-            navigator.clipboard.writeText(publicUrl).then(() => {
-                alert("Public vote link copied!\nAnyone with this link can vote anonymously:\n" + publicUrl);
+            const groupName = (currentGroupData && currentGroupData.name) || "DareDrop";
+            shareOrCopy({
+                title: `Vote on ${groupName}`,
+                text: `Vote anonymously on the latest DareDrop challenge from ${groupName}.`,
+                url: publicUrl,
+                copyMessage: "Public vote link copied!",
+                btnEl: e.currentTarget
             });
         });
 
