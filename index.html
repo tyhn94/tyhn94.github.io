@@ -764,8 +764,20 @@
                     // Group was deleted by admin, flag for cleanup
                     needsDbUpdate = true;
                 } else {
-                    validGroups.push(groupInfo);
                     const gData = docSnap.data();
+                    const isStillMember = (gData.members || []).includes(currentUserName);
+
+                    // We were kicked (or otherwise removed) from this group. Drop it from
+                    // the local list so it doesn't show in My Groups. The Firestore sync
+                    // happens in the same batched update below (needsDbUpdate flag).
+                    // Re-joining is still possible — the admin's invite link runs through
+                    // joinExistingGroup, which re-adds previously-removed users.
+                    if (!isStillMember) {
+                        needsDbUpdate = true;
+                        continue;
+                    }
+
+                    validGroups.push(groupInfo);
                     const isAdmin = gData.adminName === currentUserName;
 
                     const row = document.createElement('div');
@@ -858,6 +870,24 @@
             openDashboard(newGroupId);
         });
 
+        // Removes a group from this user's groups array. Used when we detect the user
+        // is no longer a member (kicked, voluntarily left in the future, etc.). The group
+        // document itself stays untouched — only the user's "my groups" reference is cleared.
+        // Re-joining via invite link still works: joinExistingGroup re-adds them automatically.
+        async function removeGroupFromUserProfile(groupId) {
+            if (!userData || !userData.groups) return;
+            const filtered = userData.groups.filter(g => g.id !== groupId);
+            if (filtered.length === userData.groups.length) return; // Nothing to remove.
+            userData.groups = filtered;
+            try {
+                const userRefId = currentUserName.toLowerCase();
+                await updateDoc(doc(db, "users", userRefId), { groups: filtered });
+            } catch (e) {
+                console.warn("[removeGroupFromUserProfile] DB update failed:", e);
+                // Local state is already updated — next renderMyGroups will retry the cleanup.
+            }
+        }
+
         async function joinExistingGroup(groupId) {
             try {
                 const groupRef = doc(db, "groups", groupId);
@@ -889,7 +919,10 @@
                         await updateDoc(doc(db, "users", userRefId), {
                             groups: arrayUnion(groupInfo)
                         });
-                        userData.groups.push(groupInfo);
+                        // Avoid duplicate entry if local state still has the group from a stale render.
+                        if (!userData.groups.some(g => g.id === groupId)) {
+                            userData.groups.push(groupInfo);
+                        }
                     }
                     openDashboard(groupId);
                 } else {
@@ -926,6 +959,10 @@
             
             const amIStillMember = currentGroupData.members.includes(currentUserName);
             if(!amIStillMember) {
+                // We're no longer in the group — clean up our user record so it disappears
+                // from My Groups too. They can rejoin later via the invite link
+                // (joinExistingGroup handles re-adding kicked users automatically).
+                await removeGroupFromUserProfile(currentGroupId);
                 alert("You failed to survive or were kicked from this group.");
                 window.renderMyGroups();
                 return;
