@@ -123,6 +123,22 @@
         .filter-chip:hover { border-color: #ff66cc; color: #ff66cc; }
         .filter-chip.active { border-color: #ff66cc; background: #ff66cc; color: var(--bg-color); }
 
+        /* Native <select> styled to match the terminal aesthetic. Custom dropdown arrow
+           drawn as inline SVG data URI so it picks up the pink theme color. */
+        .filter-select {
+            width: 100%; padding: 8px 30px 8px 10px; font-size: 13px;
+            font-family: inherit; background: transparent; color: var(--text-main);
+            border: 1px solid #555; cursor: pointer; outline: none;
+            -webkit-appearance: none; -moz-appearance: none; appearance: none;
+            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'><path fill='%23ff66cc' d='M2 4l4 4 4-4z'/></svg>");
+            background-repeat: no-repeat; background-position: right 10px center;
+            background-size: 12px;
+            transition: border-color 0.15s;
+        }
+        .filter-select:hover, .filter-select:focus { border-color: #ff66cc; }
+        /* Option styling is browser-controlled and limited; this keeps the popup readable on dark backgrounds. */
+        .filter-select option { background: #111; color: var(--text-main); }
+
         .popular-card {
             border: 1px solid #444; padding: 10px; margin-bottom: 10px;
             background: rgba(255, 102, 204, 0.04); animation: fadeIn 0.3s ease-out;
@@ -278,9 +294,9 @@
 
                 <div>
                     <p style="font-size: 11px; color: #888; margin: 0 0 5px;">Category:</p>
-                    <div id="popular-category-chips" class="chip-row">
-                        <!-- Populated dynamically from challenges.json so adding a category to JSON adds a chip here. -->
-                    </div>
+                    <select id="popular-category-select" class="filter-select">
+                        <!-- Populated dynamically from challenges.json so adding a category to JSON adds an option here. -->
+                    </select>
                 </div>
             </div>
 
@@ -1848,22 +1864,25 @@
         const POPULAR_FETCH_LIMIT = 100;    // Pull this many recent entries; client-side sorts/filters.
 
         function setupPopularFeed() {
-            // Render category chips fresh each time — picks up any JSON edits the user made.
-            const catChips = document.getElementById('popular-category-chips');
+            // Render category options fresh each time — picks up any JSON edits the user made.
+            // Native <select> scales effortlessly to hundreds of categories and gets a free
+            // mobile-native picker; chips were nice for ~5 but break down past that.
+            const catSelect = document.getElementById('popular-category-select');
             const cats = (challengeData && challengeData.categories) || [];
-            const chipsHtml = ['<button class="filter-chip active" data-cat="all">All</button>']
-                .concat(cats.map(c => `<button class="filter-chip" data-cat="${c.id}">${c.emoji || '🎲'} ${c.name}</button>`))
+            const optionsHtml = ['<option value="all">All Categories</option>']
+                .concat(cats.map(c => `<option value="${escapeHtml(c.id)}">${c.emoji || '🎲'} ${escapeHtml(c.name)}</option>`))
                 .join('');
-            catChips.innerHTML = chipsHtml;
+            catSelect.innerHTML = optionsHtml;
 
             // Reset filter state to defaults each time we land on the screen.
             popularFeedState.time = 'week';
             popularFeedState.categoryId = 'all';
+            catSelect.value = 'all';
             document.querySelectorAll('#popular-time-chips .filter-chip').forEach(b => {
                 b.classList.toggle('active', b.dataset.time === 'week');
             });
 
-            // Wire chip clicks (idempotent — replace handlers each render to avoid stacking).
+            // Wire handlers (idempotent — replace each render to avoid stacking).
             document.getElementById('popular-time-chips').onclick = (e) => {
                 const btn = e.target.closest('.filter-chip');
                 if (!btn) return;
@@ -1871,11 +1890,8 @@
                 document.querySelectorAll('#popular-time-chips .filter-chip').forEach(b => b.classList.toggle('active', b === btn));
                 renderPopularFeed();
             };
-            document.getElementById('popular-category-chips').onclick = (e) => {
-                const btn = e.target.closest('.filter-chip');
-                if (!btn) return;
-                popularFeedState.categoryId = btn.dataset.cat;
-                document.querySelectorAll('#popular-category-chips .filter-chip').forEach(b => b.classList.toggle('active', b === btn));
+            catSelect.onchange = (e) => {
+                popularFeedState.categoryId = e.target.value;
                 renderPopularFeed();
             };
 
