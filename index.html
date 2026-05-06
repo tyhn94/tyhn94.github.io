@@ -151,11 +151,10 @@
             border: 1px solid #444; padding: 0; margin-bottom: 14px;
             background: rgba(255, 102, 204, 0.04); animation: fadeIn 0.3s ease-out;
             position: relative; /* establishes containing block for sticky children */
-            /* Approximate height of the card's top sticky bar. Used as the offset for the
-               submission sub-headers below, so they pin BELOW the card sticky instead of
-               on top of it. Expanded long challenges slightly exceed this, accepted trade-off
-               (expand state is rare and user-initiated). */
-            --pop-sticky-h: 76px;
+            /* --pop-sticky-h is set at runtime by measurePopularStickyHeights() based on the
+               actual rendered height of the card sticky bar — handles short/long challenges
+               and expand state correctly. Initial fallback in case JS hasn't run yet. */
+            --pop-sticky-h: 80px;
         }
         /* Sticky context bar — pinned to the container's scroll top while the card is in view.
            Anchored to .container's overflow context (max-height: 95vh, overflow-y: auto).
@@ -2357,7 +2356,37 @@
             // Pass the index, not a medal emoji — renderPopularCard derives gold/silver/bronze
             // styling from the tier (idx + 1) for the sticky header accent.
             listEl.innerHTML = filtered.map((item, idx) => renderPopularCard(item, idx)).join('');
+
+            // After the DOM is populated, measure each card's sticky bar so submission
+            // sub-headers pin BELOW it instead of underneath. Done after innerHTML write
+            // so heights are real. Iframes may load later and not change the bar height
+            // (it's text-only), so a one-shot measurement is enough — but we also re-run
+            // after expand toggles in togglePopularChallenge.
+            requestAnimationFrame(measurePopularStickyHeights);
         }
+
+        // Sets each card's --pop-sticky-h custom property to the actual rendered height
+        // of its .pop-sticky bar. Submission sub-headers use this as their `top` offset.
+        function measurePopularStickyHeights() {
+            document.querySelectorAll('.popular-card').forEach(card => {
+                const sticky = card.querySelector('.pop-sticky');
+                if (!sticky) return;
+                // offsetHeight includes padding + border, which is what we want — the visible
+                // pinned area. Add 0 (no buffer) since both bars share the same dark background;
+                // a 1-2px overlap would actually cause visible double-border.
+                const h = sticky.offsetHeight;
+                card.style.setProperty('--pop-sticky-h', h + 'px');
+            });
+        }
+
+        // Re-measure when the viewport resizes (rotation, desktop window resize) — text wrap
+        // in the challenge changes the sticky height. Debounced so it doesn't thrash on
+        // continuous drag-resize. The query is cheap when there are no popular cards.
+        let _popResizeTimer = null;
+        window.addEventListener('resize', () => {
+            clearTimeout(_popResizeTimer);
+            _popResizeTimer = setTimeout(measurePopularStickyHeights, 120);
+        });
 
         function renderPopularCard(item, idx) {
             const rankLabels = ['#1 GOLD', '#2 SILVER', '#3 BRONZE'];
@@ -2446,6 +2475,9 @@
                 btn.dataset.expanded = 'true';
                 btn.innerText = '↑ less';
             }
+            // The sticky bar's height just changed — re-measure so submission sub-headers
+            // pin to the new offset rather than the stale collapsed-height value.
+            requestAnimationFrame(measurePopularStickyHeights);
         };
 
         // Render a submission link as a real embed when we recognize the host,
