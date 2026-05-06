@@ -412,6 +412,57 @@
 
         /* Discover hero — slightly accented spacing so it visually anchors the top of the screen. */
         .discover-hero { margin-top: 0; }
+
+        /* === URGENT ACTION BANNER ===
+           Sticky alert that follows the user as they scroll the dashboard. Visible only
+           when the user must submit or vote to survive — not for safe / admin / pending
+           states. Designed to be impossible to miss without being intrusive: gentle pulse
+           draws peripheral attention; tapping scrolls to the action area. */
+        .urgent-banner {
+            position: sticky; top: 0; z-index: 20;
+            margin: 0 -20px 14px; /* break out of .container's 20px padding */
+            padding: 12px 18px;
+            background: linear-gradient(180deg, #2a0010 0%, #1a0008 100%);
+            border-top: 1px solid var(--text-accent);
+            border-bottom: 2px solid var(--text-accent);
+            box-shadow: 0 4px 12px rgba(255, 0, 102, 0.3);
+            cursor: pointer;
+            animation: urgentPulse 1.6s ease-in-out infinite;
+            transition: opacity 0.2s;
+        }
+        .urgent-banner:active { opacity: 0.7; }
+        .urgent-banner-line {
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+            font-size: 15px; font-weight: bold;
+            color: var(--text-accent); text-transform: uppercase; letter-spacing: 1px;
+            text-shadow: 0 0 8px rgba(255, 0, 102, 0.6);
+        }
+        .urgent-banner-icon {
+            display: inline-block;
+            animation: urgentBounce 1.6s ease-in-out infinite;
+        }
+        .urgent-banner-sub {
+            font-size: 11px; color: #aa6680; text-align: center; margin-top: 4px;
+            text-transform: uppercase; letter-spacing: 1px;
+        }
+        /* Soft pulse on the whole banner — glow expands and contracts. Subtle, doesn't
+           strobe (which would be annoying and an accessibility issue for users with
+           photosensitivity). */
+        @keyframes urgentPulse {
+            0%, 100% { box-shadow: 0 4px 12px rgba(255, 0, 102, 0.3); }
+            50%      { box-shadow: 0 4px 22px rgba(255, 0, 102, 0.7); }
+        }
+        /* Icon does the bouncy thing the user requested — slight scale + slight rotate. */
+        @keyframes urgentBounce {
+            0%, 100% { transform: scale(1) rotate(0deg); }
+            25%      { transform: scale(1.2) rotate(-6deg); }
+            50%      { transform: scale(1.1) rotate(0deg); }
+            75%      { transform: scale(1.2) rotate(6deg); }
+        }
+        /* Reduced motion preference: stop the pulse/bounce but keep the banner styled. */
+        @media (prefers-reduced-motion: reduce) {
+            .urgent-banner, .urgent-banner-icon { animation: none; }
+        }
     </style>
 </head>
 <body>
@@ -523,6 +574,19 @@
 
         <div id="screen-dashboard" class="screen">
             <h2>GROUP: <span id="display-group"></span></h2>
+
+            <!-- Sticky urgent action banner. Hidden by default; refreshGroupData reveals it
+                 when the user must submit or vote to survive. Pulses gently so it's caught
+                 by peripheral vision without being annoying. Two-line layout: bold action
+                 line + faint reminder of the consequence ("or you'll be kicked"). Tap
+                 scrolls down to The Challenge card so the user can act immediately. -->
+            <div id="urgent-action-banner" class="urgent-banner" style="display: none;" onclick="scrollToChallengeCard()">
+                <div class="urgent-banner-line">
+                    <span class="urgent-banner-icon">⚠️</span>
+                    <span id="urgent-banner-text">ACTION REQUIRED</span>
+                </div>
+                <div id="urgent-banner-sub" class="urgent-banner-sub">Tap to act before the timer ends.</div>
+            </div>
             
             <div id="admin-panel" class="card" style="display: none; border-color: var(--admin-color); position: relative;">
                 <h3 style="margin-top:0; font-size:14px; color:var(--admin-color);">> ADMIN PANEL</h3>
@@ -858,6 +922,13 @@
         window.showScreen = function(screenId) {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
             document.getElementById(screenId).classList.add('active');
+            // Urgent banner is dashboard-only state; clear it on any screen change so it
+            // doesn't visually carry over (it's hidden by display:none anyway since it
+            // lives inside #screen-dashboard, but resetting keeps state consistent).
+            if (screenId !== 'screen-dashboard') {
+                const banner = document.getElementById('urgent-action-banner');
+                if (banner) banner.style.display = 'none';
+            }
         }
 
         onAuthStateChanged(auth, async (user) => {
@@ -1279,6 +1350,7 @@
                 statusEl.innerText = "WAITING FOR ADMIN TO START.";
                 statusEl.style.color = "var(--admin-color)";
                 document.getElementById('time-remaining-display').innerText = "00:00:00";
+                hideUrgentBanner();
                 
                 if (isAdmin) {
                     // Need at least one other member before the round can start — single-person
@@ -1295,6 +1367,7 @@
             } else if (status === 'resolved') {
                 statusEl.innerText = "ROUND OVER! Waiting for admin to draft new round.";
                 statusEl.style.color = "#888";
+                hideUrgentBanner();
             } else {
                 // Admin gets a different framing: they're protected from kicks (so the
                 // "or you'll get kicked!" stick doesn't apply), but the carrot of XP still
@@ -1302,15 +1375,19 @@
                 if (isAdmin) {
                     statusEl.innerText = "👑 ADMIN: Play to earn XP (you can't be kicked).";
                     statusEl.style.color = "var(--admin-color)";
+                    hideUrgentBanner();
                 } else if (isSafe) {
                     statusEl.innerText = "✅ YOU ARE SAFE FROM THE KICK.";
                     statusEl.style.color = "var(--text-main)";
+                    hideUrgentBanner();
                 } else if (!hasSubmitted) {
                     statusEl.innerText = "❌ SUBMIT A LINK TO SURVIVE!";
                     statusEl.style.color = "var(--text-accent)";
+                    showUrgentBanner('SUBMIT YOUR LINK', "Or you'll be kicked when the timer hits zero.");
                 } else {
                     statusEl.innerText = "❌ YOU MUST VOTE TO SURVIVE!";
                     statusEl.style.color = "var(--text-accent)";
+                    showUrgentBanner('VOTE ON THE OTHERS', "You submitted — now vote to stay in the game.");
                 }
 
                 if (!hasSubmitted) {
@@ -1579,6 +1656,33 @@
                 <p style="font-size: 11px; color: #888; margin: 0 0 6px; text-transform: uppercase; letter-spacing: 1px;">▾ Preview (what voters will see)</p>
                 <div class="pop-sub-embed" style="margin-bottom: 12px;">${renderEmbed(url)}</div>
             `;
+        };
+
+        // === URGENT ACTION BANNER HELPERS ===
+        // Show/hide the sticky red banner at the top of the dashboard. Called from
+        // refreshGroupData based on the user's status (must submit, must vote, etc.).
+        function showUrgentBanner(text, sub) {
+            const banner = document.getElementById('urgent-action-banner');
+            const textEl = document.getElementById('urgent-banner-text');
+            const subEl = document.getElementById('urgent-banner-sub');
+            if (!banner || !textEl) return;
+            textEl.innerText = text;
+            if (subEl && sub) subEl.innerText = sub;
+            banner.style.display = 'block';
+        }
+        function hideUrgentBanner() {
+            const banner = document.getElementById('urgent-action-banner');
+            if (banner) banner.style.display = 'none';
+        }
+        // Tapping the banner scrolls to the Challenge card so the user is dropped right
+        // at the input/voting area. Smooth scroll inside .container's overflow context.
+        window.scrollToChallengeCard = function() {
+            const target = document.getElementById('interaction-section');
+            const container = document.querySelector('.container');
+            if (!target || !container) return;
+            // Compute scroll position relative to the container (it's the scrollable parent).
+            const targetTop = target.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop;
+            container.scrollTo({ top: targetTop - 80, behavior: 'smooth' }); // -80 leaves the banner visible
         };
 
         window.submitProof = async function() {
