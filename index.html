@@ -481,7 +481,15 @@
                 await joinExistingGroup(inviteGroupId);
                 window.history.replaceState(null, "", window.location.pathname);
             } else {
-                window.renderMyGroups();
+                // Resume on the last visited group dashboard if there is one and the user is still a member.
+                const lastGroupId = localStorage.getItem("daredrop_last_group_id");
+                const stillMember = lastGroupId && userData.groups && userData.groups.some(g => g.id === lastGroupId);
+                if (stillMember) {
+                    openDashboard(lastGroupId);
+                } else {
+                    if (lastGroupId) localStorage.removeItem("daredrop_last_group_id");
+                    window.renderMyGroups();
+                }
             }
         }
 
@@ -497,6 +505,8 @@
         // REWRITTEN: Now checks database to apply admin tags and clean up deleted groups
         window.renderMyGroups = async function() {
             showScreen('screen-my-groups');
+            // User explicitly returned to the menu — clear the resume marker so a fresh refresh lands here.
+            localStorage.removeItem("daredrop_last_group_id");
             if (countdownTimer) clearInterval(countdownTimer); 
             document.getElementById('display-username').innerText = userData.name;
 
@@ -666,6 +676,8 @@
 
         async function openDashboard(groupId) {
             currentGroupId = groupId;
+            // Persist last visited group so a page refresh resumes here instead of bouncing to My Groups.
+            localStorage.setItem("daredrop_last_group_id", groupId);
             document.getElementById('member-list-ui').innerHTML = "<li>Loading...</li>";
             showScreen('screen-dashboard');
             
@@ -1267,6 +1279,7 @@
         window.switchUser = function() {
             if(confirm("Are you sure you want to switch users?")) {
                 localStorage.removeItem("daredrop_username");
+                localStorage.removeItem("daredrop_last_group_id");
                 location.reload(); 
             }
         }
