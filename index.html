@@ -217,6 +217,33 @@
             display: flex; justify-content: space-between; align-items: center;
             font-size: 11px; margin-bottom: 6px; gap: 8px;
         }
+        .popular-card .pop-sub-rank {
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 2px 7px; font-size: 11px; font-weight: bold;
+            border: 1px solid currentColor; flex-shrink: 0;
+        }
+        /* Mirror the same gold/silver/bronze hierarchy used in the sticky header,
+           so a #1 submission visually echoes its podium tier. */
+        .popular-card .pop-sub-rank.rank-1 { color: #ffd700; }
+        .popular-card .pop-sub-rank.rank-2 { color: #c0c0c0; }
+        .popular-card .pop-sub-rank.rank-3 { color: #cd7f32; }
+        .popular-card .pop-sub-rank.rank-other { color: #888; }
+        .popular-card .pop-sub-name-block {
+            display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1;
+        }
+
+        /* Inline expand/collapse for the (clamped) challenge text inside the sticky bar.
+           When .expanded is set, drop the line-clamp so the full text shows. */
+        .popular-card .pop-challenge-wrap { position: relative; }
+        .popular-card .pop-challenge.expanded {
+            max-height: none; -webkit-line-clamp: unset; display: block;
+        }
+        .popular-card .pop-expand-btn {
+            background: transparent; border: none; padding: 2px 0; margin-top: 2px;
+            color: #ff66cc; font-family: inherit; font-size: 11px; cursor: pointer;
+            text-transform: uppercase; letter-spacing: 1px;
+        }
+        .popular-card .pop-expand-btn:hover { color: #fff; }
         .popular-card .pop-sub-embed {
             width: 100%; background: #000; overflow: hidden; border: 1px solid #222;
         }
@@ -2324,22 +2351,37 @@
                 ? `<span class="pop-custom-badge">⭐ CUSTOM by ${escapeHtml(item.customAuthor || '?')}</span>`
                 : '';
 
-            const subsHtml = (item.submissions || []).map(s => {
+            // Submissions are already sorted by XP desc in the index, so subIdx is the rank.
+            // Trophy icon (🏆) is gender-neutral and echoes the podium concept used in the
+            // sticky header — but we colour-code 1/2/3 to mirror gold/silver/bronze.
+            const subsHtml = (item.submissions || []).map((s, subIdx) => {
+                const subRank = subIdx + 1;
+                const rankClass = subRank <= 3 ? `rank-${subRank}` : 'rank-other';
                 return `
                     <div class="pop-sub-block">
                         <div class="pop-sub-head">
-                            <strong style="color:var(--text-accent);">${escapeHtml(s.username)}</strong>
+                            <div class="pop-sub-name-block">
+                                <span class="pop-sub-rank ${rankClass}">🏆 #${subRank}</span>
+                                <strong style="color:var(--text-accent); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(s.username)}</strong>
+                            </div>
                             <span style="color:#888; white-space:nowrap;">${s.voteCount} 🌐 · ${s.xp} XP</span>
                         </div>
                         <div class="pop-sub-embed">${renderEmbed(s.link)}</div>
                     </div>`;
             }).join('');
 
+            // Decide whether the challenge text needs the more/less toggle.
+            // ~80 chars is roughly where 2 lines start to clamp inside the sticky bar at our
+            // current font + container width. Below that, we skip the toggle to avoid clutter.
+            const challengeText = item.challengeText || '';
+            const needsExpand = challengeText.length > 80;
+            const expandBtn = needsExpand
+                ? `<button class="pop-expand-btn" onclick="togglePopularChallenge(this)" data-expanded="false">↓ more</button>`
+                : '';
+
             // Card structure:
             //   .pop-sticky (sticks while card is in view) → rank badge + category/group + challenge text
             //   .pop-body (scrolls normally)              → meta row + submissions (embeds)
-            // The sticky bar carries everything the user needs to keep oriented while scrolling
-            // through the embeds. The body is freely scrollable beneath it.
             return `
                 <div class="popular-card tier-${tier}">
                     <div class="pop-sticky">
@@ -2348,7 +2390,10 @@
                             <span class="pop-context">${escapeHtml(item.categoryEmoji || '🎲')} <strong>${escapeHtml(item.categoryName || 'Category')}</strong> · in <strong>${escapeHtml(item.groupName || 'group')}</strong>${customBadge}</span>
                             <span class="pop-time">${formatRelativeTime(item.completedAt)}</span>
                         </div>
-                        <div class="pop-challenge">"${escapeHtml(item.challengeText || '')}"</div>
+                        <div class="pop-challenge-wrap">
+                            <div class="pop-challenge">"${escapeHtml(challengeText)}"</div>
+                            ${expandBtn}
+                        </div>
                     </div>
                     <div class="pop-body">
                         <div class="pop-meta">
@@ -2365,6 +2410,26 @@
                     </div>
                 </div>`;
         }
+
+        // Inline expand/collapse for the clamped challenge text inside a popular card's sticky bar.
+        // Scoped per-card via DOM traversal — no shared state, so multiple cards can be expanded
+        // independently. Stored on the button's data attribute, not in JS state, so re-renders
+        // (filter changes) reset to collapsed naturally.
+        window.togglePopularChallenge = function(btn) {
+            const wrap = btn.closest('.pop-challenge-wrap');
+            if (!wrap) return;
+            const textEl = wrap.querySelector('.pop-challenge');
+            const expanded = btn.dataset.expanded === 'true';
+            if (expanded) {
+                textEl.classList.remove('expanded');
+                btn.dataset.expanded = 'false';
+                btn.innerText = '↓ more';
+            } else {
+                textEl.classList.add('expanded');
+                btn.dataset.expanded = 'true';
+                btn.innerText = '↑ less';
+            }
+        };
 
         // Render a submission link as a real embed when we recognize the host,
         // otherwise fall back to a plain link. Iframes use loading="lazy" so a feed
