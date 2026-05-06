@@ -233,7 +233,7 @@
                     Enable Public Voting
                 </label>
                 <p style="font-size: 11px; color: #888; margin: 5px 0 0 28px;">Anyone with the public link can vote anonymously. Round won't end early - waits for full timer.</p>
-                <button class="btn btn-admin" id="btn-save-admin" style="padding: 8px; margin-top: 15px; font-size: 14px;">Save Settings</button>
+                <p id="admin-save-status" style="font-size: 11px; color: var(--text-main); margin: 12px 0 0; text-align: right; min-height: 14px; opacity: 0; transition: opacity 0.2s;">✓ Saved</p>
                 </fieldset>
             </div>
 
@@ -1132,41 +1132,96 @@
             }, 1000);
         }
 
-        document.getElementById('btn-save-admin').addEventListener('click', async () => {
-            // Defensive: even if disabled was bypassed via devtools, refuse to save mid-round.
-            if (currentGroupData && currentGroupData.challengeStatus === 'active') {
-                alert("Settings are locked while the challenge is active. Reroll to draft a new round first.");
-                return;
+        // Auto-save helper for admin settings. Updates Firestore, mirrors locally, flashes status.
+        // Skips a full refreshGroupData() so a typing user doesn't lose focus mid-edit; instead
+        // we patch only the derivative UI bits (member count badge, public voting card).
+        async function saveAdminFields(updates) {
+            if (!currentGroupId || !currentGroupData) return;
+            if (currentGroupData.challengeStatus === 'active') return; // Defensive — fieldset is already disabled.
+
+            const statusEl = document.getElementById('admin-save-status');
+            statusEl.style.color = 'var(--text-main)';
+            statusEl.innerText = 'Saving...';
+            statusEl.style.opacity = '0.6';
+
+            try {
+                await updateDoc(doc(db, "groups", currentGroupId), updates);
+                Object.assign(currentGroupData, updates); // Local mirror so subsequent reads/validations are accurate.
+
+                // Patch derivative UI without full re-render.
+                if ('maxMembers' in updates) {
+                    document.getElementById('max-count').innerText = updates.maxMembers;
+                }
+                if ('publicVotingEnabled' in updates) {
+                    const pvCard = document.getElementById('public-vote-status');
+                    const pvLabel = document.getElementById('pv-status-label');
+                    const pvDesc = document.getElementById('pv-status-desc');
+                    const pvCopyBtn = document.getElementById('btn-copy-public-vote');
+                    if (updates.publicVotingEnabled) {
+                        pvCard.style.borderColor = '#ff66cc';
+                        pvLabel.innerText = 'ON';
+                        pvLabel.style.color = '#ff66cc';
+                        pvDesc.innerText = 'Outsiders can vote anonymously via the public link. Round runs the full timer.';
+                        pvCopyBtn.style.display = 'block';
+                    } else {
+                        pvCard.style.borderColor = '#444';
+                        pvLabel.innerText = 'OFF';
+                        pvLabel.style.color = '#888';
+                        pvDesc.innerText = '';
+                        pvCopyBtn.style.display = 'none';
+                    }
+                }
+
+                statusEl.innerText = '✓ Saved';
+                statusEl.style.opacity = '1';
+                clearTimeout(statusEl._fadeTimer);
+                statusEl._fadeTimer = setTimeout(() => { statusEl.style.opacity = '0'; }, 1500);
+            } catch (e) {
+                console.error("[saveAdminFields]", e);
+                statusEl.innerText = '⚠ Save failed';
+                statusEl.style.color = 'var(--text-accent)';
+                statusEl.style.opacity = '1';
             }
+        }
 
-            const newMax = parseInt(document.getElementById('max-members-input').value) || 10;
-            let newHours = parseInt(document.getElementById('challenge-hours-input').value);
-            let newMins = parseInt(document.getElementById('challenge-mins-input').value);
-            const adminOnly = document.getElementById('admin-invite-checkbox').checked;
-            const publicVoting = document.getElementById('public-voting-checkbox').checked;
-
-            if (isNaN(newHours)) newHours = 0;
-            if (isNaN(newMins)) newMins = 0;
-            
-            if (newHours === 0 && newMins === 0) {
-                newHours = 24; 
-            }
-
-            if(newMax < currentGroupData.members.length) {
+        // Max members — validates against current member count; reverts on invalid input.
+        document.getElementById('max-members-input').addEventListener('change', (e) => {
+            let newMax = parseInt(e.target.value);
+            if (isNaN(newMax) || newMax < 1) newMax = 10;
+            if (newMax < currentGroupData.members.length) {
                 alert("Maximum member count cannot be less than the current member count. Kick some members first.");
+                e.target.value = currentGroupData.maxMembers; // Revert visually.
                 return;
             }
+            e.target.value = newMax; // Normalize display.
+            if (newMax === currentGroupData.maxMembers) return; // No-op, nothing to save.
+            saveAdminFields({ maxMembers: newMax });
+        });
 
-            document.getElementById('btn-save-admin').innerText = "...";
-            await updateDoc(doc(db, "groups", currentGroupId), {
-                maxMembers: newMax,
-                challengeDurationHours: newHours,
-                challengeDurationMins: newMins,
-                adminOnlyInvites: adminOnly,
-                publicVotingEnabled: publicVoting
-            });
-            document.getElementById('btn-save-admin').innerText = "Save Settings";
-            refreshGroupData();
+        // Time limit — hours and mins share validation. If both end up zero, snap to 24h default.
+        function saveTimeLimit() {
+            let h = parseInt(document.getElementById('challenge-hours-input').value);
+            let m = parseInt(document.getElementById('challenge-mins-input').value);
+            if (isNaN(h) || h < 0) h = 0;
+            if (isNaN(m) || m < 0) m = 0;
+            if (h === 0 && m === 0) h = 24;
+            // Reflect normalized values back to the inputs.
+            document.getElementById('challenge-hours-input').value = h;
+            document.getElementById('challenge-mins-input').value = m;
+            const prevH = currentGroupData.challengeDurationHours;
+            const prevM = currentGroupData.challengeDurationMins || 0;
+            if (h === prevH && m === prevM) return; // No-op.
+            saveAdminFields({ challengeDurationHours: h, challengeDurationMins: m });
+        }
+        document.getElementById('challenge-hours-input').addEventListener('change', saveTimeLimit);
+        document.getElementById('challenge-mins-input').addEventListener('change', saveTimeLimit);
+
+        // Checkboxes — save instantly on toggle.
+        document.getElementById('admin-invite-checkbox').addEventListener('change', (e) => {
+            saveAdminFields({ adminOnlyInvites: e.target.checked });
+        });
+        document.getElementById('public-voting-checkbox').addEventListener('change', (e) => {
+            saveAdminFields({ publicVotingEnabled: e.target.checked });
         });
 
         document.getElementById('btn-reroll').addEventListener('click', async () => {
