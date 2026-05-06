@@ -52,6 +52,12 @@
         .btn-admin { border-color: var(--admin-color); color: var(--admin-color); }
         .btn-admin:hover:not(:disabled) { background: var(--admin-color); color: var(--bg-color); }
         .btn:disabled { border-color: #555 !important; color: #555 !important; cursor: not-allowed; background: transparent !important; }
+        input:disabled, input[type="checkbox"]:disabled {
+            opacity: 0.4; cursor: not-allowed;
+        }
+        .category-current-pill:disabled {
+            opacity: 0.4; cursor: not-allowed; pointer-events: none;
+        }
         
         input[type="text"], input[type="number"] {
             width: 100%; padding: 10px; background: #000; border: 1px solid var(--text-main);
@@ -223,6 +229,9 @@
                     Enable Public Voting
                 </label>
                 <p style="font-size: 11px; color: #888; margin: 5px 0 0 28px;">Anyone with the public link can vote anonymously. Round won't end early - waits for full timer.</p>
+                <p id="admin-lock-notice" style="display: none; font-size: 12px; color: var(--admin-color); border: 1px dashed var(--admin-color); padding: 8px; margin: 12px 0 0; text-align: center;">
+                    🔒 Settings locked while challenge is active. Reroll to draft a new round.
+                </p>
                 <button class="btn btn-admin" id="btn-save-admin" style="padding: 8px; margin-top: 15px; font-size: 14px;">Save Settings</button>
             </div>
 
@@ -744,6 +753,24 @@
                 const cat = getCategoryById(currentGroupData.currentCategoryId);
                 document.getElementById('current-category-emoji').innerText = cat.emoji || '🎲';
                 document.getElementById('current-category-name').innerText = cat.name || 'Default';
+
+                // Lock admin settings while a challenge is active. Unlocks on 'pending' (no round yet)
+                // or 'resolved' (round finished, ready to draft next). Reroll button stays enabled either way.
+                const settingsLocked = (status === 'active');
+                const adminInputs = [
+                    'max-members-input',
+                    'challenge-hours-input',
+                    'challenge-mins-input',
+                    'admin-invite-checkbox',
+                    'public-voting-checkbox',
+                    'btn-pick-category',
+                    'btn-save-admin'
+                ];
+                adminInputs.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.disabled = settingsLocked;
+                });
+                document.getElementById('admin-lock-notice').style.display = settingsLocked ? 'block' : 'none';
             }
 
             if(currentGroupData.adminOnlyInvites && !isAdmin) {
@@ -1111,6 +1138,12 @@
         }
 
         document.getElementById('btn-save-admin').addEventListener('click', async () => {
+            // Defensive: even if disabled was bypassed via devtools, refuse to save mid-round.
+            if (currentGroupData && currentGroupData.challengeStatus === 'active') {
+                alert("Settings are locked while the challenge is active. Reroll to draft a new round first.");
+                return;
+            }
+
             const newMax = parseInt(document.getElementById('max-members-input').value) || 10;
             let newHours = parseInt(document.getElementById('challenge-hours-input').value);
             let newMins = parseInt(document.getElementById('challenge-mins-input').value);
@@ -1219,6 +1252,11 @@
         // CATEGORY PICKER - admin selects which pool reroll draws from
         // ============================================================
         document.getElementById('btn-pick-category').addEventListener('click', () => {
+            // Defensive: don't open the category picker mid-round even if the button was force-enabled.
+            if (currentGroupData && currentGroupData.challengeStatus === 'active') {
+                alert("Category is locked while the challenge is active. Reroll to draft a new round first.");
+                return;
+            }
             openCategoryOverlay();
         });
 
