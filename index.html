@@ -2,8 +2,16 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>DareDrop - MVP (Admin Menu Edition)</title>
+    <!-- PWA: makes the app installable + lets share_target receive Instagram/TikTok shares on Android.
+         iOS Safari ignores share_target but still honors apple-* tags for standalone install. -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#33ff00">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="DareDrop">
+    <link rel="apple-touch-icon" href="icon.svg">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;700&display=swap');
 
@@ -250,6 +258,15 @@
             <h1 class="title-glitch">DareDrop_</h1>
             <h2>WELCOME, <span id="display-username" style="color:var(--text-accent);"></span></h2>
 
+            <!-- Banner appears only when there's a pending shared link from PWA share_target.
+                 Tells the user to pick a group; the link is auto-filled when they enter one. -->
+            <div id="pending-share-banner" class="card" style="display: none; border-color: #ff66cc; background: rgba(255, 102, 204, 0.08);">
+                <p style="margin: 0 0 6px; font-size: 13px; color: #ff66cc;">📥 Link ready to submit</p>
+                <p id="pending-share-url" style="margin: 0 0 10px; font-size: 11px; color: #aaa; word-break: break-all; font-family: inherit;"></p>
+                <p style="margin: 0 0 10px; font-size: 11px; color: #888;">Pick a group below — your link will be filled in automatically.</p>
+                <button class="btn" onclick="clearPendingShare()" style="margin: 0; padding: 6px; font-size: 11px; border-color: #555; color: #888;">Cancel</button>
+            </div>
+
             <div class="card" id="user-stats-card" style="text-align: center; border-color: var(--text-accent);">
                 <p style="margin: 0 0 5px; font-size: 12px; color: #888;">> TOTAL XP EARNED</p>
                 <div style="font-size: 38px; color: var(--text-accent); font-weight: bold; line-height: 1;" id="user-total-xp">0</div>
@@ -317,15 +334,15 @@
                 </p>
                 <fieldset id="admin-settings-fieldset" style="border: none; padding: 0; margin: 0;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                    <label style="font-size: 14px;">Max Member Capacity:</label>
-                    <input type="number" id="max-members-input" style="width: 80px; margin: 0; text-align: center;">
+                    <label style="font-size: 14px;">Max Members <span style="color:#666; font-size: 11px;">(up to 10):</span></label>
+                    <input type="number" id="max-members-input" style="width: 80px; margin: 0; text-align: center;" min="1" max="10">
                 </div>
                 
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                    <label style="font-size: 14px;">Time Limit (Hrs/Mins):</label>
+                    <label style="font-size: 14px;">Time Limit <span style="color:#666; font-size: 11px;">(5 mins – 7 days):</span></label>
                     <div style="display: flex; gap: 5px;">
-                        <input type="number" id="challenge-hours-input" placeholder="Hrs" style="width: 60px; margin: 0; text-align: center;" min="0">
-                        <input type="number" id="challenge-mins-input" placeholder="Mins" style="width: 60px; margin: 0; text-align: center;" min="0">
+                        <input type="number" id="challenge-hours-input" placeholder="Hrs" style="width: 60px; margin: 0; text-align: center;" min="0" max="168">
+                        <input type="number" id="challenge-mins-input" placeholder="Mins" style="width: 60px; margin: 0; text-align: center;" min="0" max="59">
                     </div>
                 </div>
 
@@ -489,6 +506,50 @@
         const inviteGroupId = urlParams.get('groupId');
         const publicVoteIdFromUrl = urlParams.get('publicVoteId');
 
+        // ─────────────────────────────────────────────────────────────────────
+        // PWA SHARE TARGET — when the user picks "Share to DareDrop" from
+        // Instagram / TikTok / etc. on Android, the OS opens this URL with
+        // share_title / share_text / share_url params (mapped in manifest.json).
+        // We extract whatever URL we can find and stash it for the next group
+        // submission flow. Cleaned out of the URL bar so refreshing doesn't
+        // re-trigger the share.
+        // ─────────────────────────────────────────────────────────────────────
+        (function captureShareIntent() {
+            const sharedUrl = urlParams.get('share_url') || '';
+            const sharedText = urlParams.get('share_text') || '';
+            const sharedTitle = urlParams.get('share_title') || '';
+            if (!sharedUrl && !sharedText && !sharedTitle) return;
+
+            // Apps vary in which field they fill — Instagram puts the URL in `text`
+            // alongside a caption, others in `url`. Find any http(s) URL anywhere.
+            let detected = sharedUrl.trim();
+            if (!detected) {
+                const blob = `${sharedText} ${sharedTitle}`;
+                const m = blob.match(/https?:\/\/[^\s]+/i);
+                if (m) detected = m[0];
+            }
+            if (detected) {
+                localStorage.setItem('daredrop_pending_share', detected);
+            }
+            // Strip share params from the URL so a refresh doesn't replay this.
+            const cleanParams = new URLSearchParams(window.location.search);
+            ['share_url', 'share_text', 'share_title'].forEach(k => cleanParams.delete(k));
+            const cleanQuery = cleanParams.toString();
+            window.history.replaceState(null, '',
+                window.location.pathname + (cleanQuery ? '?' + cleanQuery : '')
+            );
+        })();
+
+        // Register the service worker. Required for PWA installability on Android Chrome.
+        // No-op if the browser doesn't support it (older Safari, etc.).
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').catch(err => {
+                    console.warn('[pwa] service worker registration failed:', err);
+                });
+            });
+        }
+
         // Anonymous public-voter ID - persisted per-device for abuse protection.
         // One ID = one vote allowed per submission. Cleared with localStorage by user.
         function getPublicVoterId() {
@@ -582,6 +643,14 @@
         // ─────────────────────────────────────────────────────────────────────
         const SUPERUSER_NAMES = ['idil1'];
 
+        // Centralised limits — change once, applies everywhere.
+        const MAX_GROUP_CAPACITY = 10;          // Cap on group size; abuse vector if uncapped.
+        const MIN_CHALLENGE_MINUTES = 5;        // Floor on round duration; prevents instant-kick griefing.
+        const MAX_CHALLENGE_MINUTES = 7 * 24 * 60; // 7 days. Caps "frozen group" abuse where an admin
+                                                // sets a 10,000-hour timer and locks the leaderboard.
+                                                // Matches Twitter/Discord poll ceilings.
+        const POPULAR_FEED_TOP_N = 3;           // Submissions shown per indexed round (top by XP).
+
         function isPremiumUser() {
             if (!currentUserName) return false;
             if (SUPERUSER_NAMES.includes(currentUserName.toLowerCase())) return true;
@@ -635,13 +704,15 @@
                 await joinExistingGroup(inviteGroupId);
                 window.history.replaceState(null, "", window.location.pathname);
             } else {
-                // Resume on the last visited group dashboard if there is one and the user is still a member.
+                // If a share intent is pending, force the user through My Groups so they
+                // pick where to submit consciously — don't auto-resume to the last group.
+                const hasPendingShare = !!localStorage.getItem('daredrop_pending_share');
                 const lastGroupId = localStorage.getItem("daredrop_last_group_id");
                 const stillMember = lastGroupId && userData.groups && userData.groups.some(g => g.id === lastGroupId);
-                if (stillMember) {
+                if (stillMember && !hasPendingShare) {
                     openDashboard(lastGroupId);
                 } else {
-                    if (lastGroupId) localStorage.removeItem("daredrop_last_group_id");
+                    if (lastGroupId && !stillMember) localStorage.removeItem("daredrop_last_group_id");
                     window.renderMyGroups();
                 }
             }
@@ -666,6 +737,10 @@
 
             // Kick off global stats in parallel - don't block group rendering on it.
             loadGlobalStats();
+
+            // If a shared link is waiting (from PWA share_target), surface the banner so
+            // the user knows what'll happen when they tap a group.
+            updatePendingShareBanner();
 
             const container = document.getElementById('group-list-container');
             
@@ -983,6 +1058,21 @@
                         </div>
                         <button class="btn btn-accent" onclick="submitProof()" style="margin-top: 0;">Submit Proof</button>
                     `;
+
+                    // If we arrived from a PWA share_target with a pending link, auto-fill it now.
+                    // consumePendingShare() returns the value AND clears it — so a back-and-forth
+                    // navigation can't re-fill the same link twice.
+                    const pendingShareUrl = consumePendingShare();
+                    if (pendingShareUrl) {
+                        const inputEl = document.getElementById('proof-link-input');
+                        if (inputEl) {
+                            inputEl.value = pendingShareUrl;
+                            inputEl.style.transition = 'border-color 0.4s';
+                            inputEl.style.borderColor = 'var(--text-accent)';
+                            setTimeout(() => { inputEl.style.borderColor = ''; }, 1200);
+                        }
+                        updatePendingShareBanner();
+                    }
                 } else {
                     // Show submitter their own proof first
                     const mySub = submissions[currentUserName];
@@ -1131,6 +1221,35 @@
             }
 
             return null;
+        }
+
+        // ─────────────────────────────────────────────────────────────────────
+        // PENDING SHARE — UI helpers that work with the link captured by the
+        // share_target handler (see captureShareIntent above).
+        // ─────────────────────────────────────────────────────────────────────
+        function updatePendingShareBanner() {
+            const banner = document.getElementById('pending-share-banner');
+            if (!banner) return;
+            const url = localStorage.getItem('daredrop_pending_share');
+            if (url) {
+                document.getElementById('pending-share-url').innerText = url;
+                banner.style.display = 'block';
+            } else {
+                banner.style.display = 'none';
+            }
+        }
+
+        window.clearPendingShare = function() {
+            localStorage.removeItem('daredrop_pending_share');
+            updatePendingShareBanner();
+        };
+
+        // Returns the pending share URL and clears it. Use right when the user
+        // commits to submitting (i.e. the input is rendered and ready to accept).
+        function consumePendingShare() {
+            const url = localStorage.getItem('daredrop_pending_share');
+            if (url) localStorage.removeItem('daredrop_pending_share');
+            return url;
         }
 
         // One-tap paste for the submission input. Reads clipboard via the modern API,
@@ -1312,6 +1431,12 @@
                 };
             }).sort((a, b) => b.xp - a.xp); // Top scorer first.
 
+            // Cap stored submissions to top N to keep the popular feed scannable on a 20-person round.
+            // participantCount below stays based on the FULL list so the card can still say "20 participants"
+            // even though only 3 are displayed. totalXP/totalVotes also stay full-list — they describe the
+            // whole round, not just the showcased entries.
+            const topSubmissions = submissionsArr.slice(0, POPULAR_FEED_TOP_N);
+
             const totalXP = submissionsArr.reduce((s, x) => s + x.xp, 0);
             const totalVotes = submissionsArr.reduce((s, x) => s + x.voteCount, 0);
             const cat = getCategoryById(groupData.currentCategoryId);
@@ -1328,7 +1453,7 @@
                 categoryEmoji: cat.emoji || "🎲",
                 isCustom: !!groupData.currentChallengeIsCustom,
                 customAuthor: groupData.currentChallengeAuthor || null,
-                submissions: submissionsArr,
+                submissions: topSubmissions,
                 totalXP,
                 totalVotes,
                 participantCount: submissionsArr.length,
@@ -1423,27 +1548,49 @@
             }
         }
 
-        // Max members — validates against current member count; reverts on invalid input.
+        // Max members — validates against current member count and the global capacity cap.
         document.getElementById('max-members-input').addEventListener('change', (e) => {
             let newMax = parseInt(e.target.value);
-            if (isNaN(newMax) || newMax < 1) newMax = 10;
+            if (isNaN(newMax) || newMax < 1) newMax = MAX_GROUP_CAPACITY;
+            if (newMax > MAX_GROUP_CAPACITY) {
+                alert(`Group capacity is capped at ${MAX_GROUP_CAPACITY} members.`);
+                newMax = MAX_GROUP_CAPACITY;
+            }
             if (newMax < currentGroupData.members.length) {
                 alert("Maximum member count cannot be less than the current member count. Kick some members first.");
                 e.target.value = currentGroupData.maxMembers; // Revert visually.
                 return;
             }
-            e.target.value = newMax; // Normalize display.
+            e.target.value = newMax; // Normalize display (also reflects the cap if user typed >10).
             if (newMax === currentGroupData.maxMembers) return; // No-op, nothing to save.
             saveAdminFields({ maxMembers: newMax });
         });
 
-        // Time limit — hours and mins share validation. If both end up zero, snap to 24h default.
+        // Time limit — hours and mins share validation.
+        // Rules:
+        //   - Both 0 → "I want the default" → snap to 24h (preserves existing UX).
+        //   - Total > 0 but < MIN_CHALLENGE_MINUTES → user picked something silly → snap up to the floor.
+        //     The floor blocks an admin from setting a 1-second round to instantly kick everyone.
+        //   - Total > MAX_CHALLENGE_MINUTES → snap down. Prevents "10000-hour" abuse that would
+        //     freeze the leaderboard and block all kicks indefinitely.
         function saveTimeLimit() {
             let h = parseInt(document.getElementById('challenge-hours-input').value);
             let m = parseInt(document.getElementById('challenge-mins-input').value);
             if (isNaN(h) || h < 0) h = 0;
             if (isNaN(m) || m < 0) m = 0;
-            if (h === 0 && m === 0) h = 24;
+
+            const totalMins = h * 60 + m;
+            if (totalMins === 0) {
+                h = 24; m = 0;
+            } else if (totalMins < MIN_CHALLENGE_MINUTES) {
+                alert(`Minimum challenge duration is ${MIN_CHALLENGE_MINUTES} minutes. Snapping up.`);
+                h = 0; m = MIN_CHALLENGE_MINUTES;
+            } else if (totalMins > MAX_CHALLENGE_MINUTES) {
+                const days = MAX_CHALLENGE_MINUTES / (24 * 60);
+                alert(`Maximum challenge duration is ${days} days. Snapping down.`);
+                h = MAX_CHALLENGE_MINUTES / 60; m = 0; // 168h, 0m
+            }
+
             // Reflect normalized values back to the inputs.
             document.getElementById('challenge-hours-input').value = h;
             document.getElementById('challenge-mins-input').value = m;
@@ -2083,7 +2230,12 @@
                         <span><strong>${item.totalVotes || 0}</strong> public votes</span>
                         <span><strong>${item.participantCount || 0}</strong> participants</span>
                     </div>
-                    ${subsHtml ? `<div class="pop-submissions">${subsHtml}</div>` : ''}
+                    ${subsHtml ? `<div class="pop-submissions">
+                        ${item.participantCount > (item.submissions || []).length
+                            ? `<p style="font-size: 10px; color: #888; margin: 0 0 6px; text-transform: uppercase; letter-spacing: 1px;">Top ${(item.submissions || []).length} of ${item.participantCount}</p>`
+                            : ''}
+                        ${subsHtml}
+                    </div>` : ''}
                 </div>`;
         }
 
