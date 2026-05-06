@@ -372,6 +372,46 @@
         }
         #sound-toggle:hover { background: var(--text-main); color: var(--bg-color); }
         #sound-toggle.muted { border-color: #555; color: #555; box-shadow: none; }
+
+        /* === HOME HEADER — compact, frees room above the fold for Discover === */
+        .home-header {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 10px; margin-bottom: 14px;
+        }
+        .home-title {
+            margin: 0 !important; font-size: 22px; flex-shrink: 0;
+        }
+        /* Stat pill: tappable summary of name + XP + global rank.
+           Tapping opens the global leaderboard overlay (replaces the old standalone button). */
+        .user-stats-pill {
+            display: inline-flex; align-items: center; gap: 6px;
+            background: transparent; border: 1px solid var(--text-accent); color: var(--text-main);
+            padding: 6px 10px; font-family: inherit; font-size: 12px; cursor: pointer;
+            transition: background 0.15s, color 0.15s;
+            min-width: 0; max-width: 70%;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        @media (hover: hover) {
+            .user-stats-pill:hover { background: var(--text-accent); color: var(--bg-color); }
+            .user-stats-pill:hover .stats-pill-divider,
+            .user-stats-pill:hover #user-total-xp,
+            .user-stats-pill:hover #rank-popup-num,
+            .user-stats-pill:hover #display-username { color: var(--bg-color) !important; }
+        }
+        .user-stats-pill:active { opacity: 0.6; }
+        .stats-pill-name { overflow: hidden; text-overflow: ellipsis; }
+        .stats-pill-divider { color: #555; }
+        .stats-pill-xp strong { color: var(--text-accent); font-weight: bold; }
+        .stats-pill-rank strong { color: #ffd700; font-weight: bold; }
+
+        /* Soft section divider between the discovery zone (top) and personal zone (My Groups, Create). */
+        .home-divider {
+            border: none; height: 1px; background: linear-gradient(90deg, transparent, #333, transparent);
+            margin: 22px 0 10px;
+        }
+
+        /* Discover hero — slightly accented spacing so it visually anchors the top of the screen. */
+        .discover-hero { margin-top: 0; }
     </style>
 </head>
 <body>
@@ -396,8 +436,21 @@
         </div>
 
         <div id="screen-my-groups" class="screen">
-            <h1 class="title-glitch">DareDrop_</h1>
-            <h2>WELCOME, <span id="display-username" style="color:var(--text-accent);"></span></h2>
+            <!-- Compact header. Welcome + XP + global rank packed into a single tappable
+                 row that opens the global leaderboard overlay. Saves vertical real estate
+                 so Discover can sit above the fold. -->
+            <div class="home-header">
+                <h1 class="title-glitch home-title">DareDrop_</h1>
+                <button id="user-stats-pill" class="user-stats-pill" onclick="window.openGlobalLeaderboardOverlay()">
+                    <span class="stats-pill-name">Hi, <span id="display-username" style="color:var(--text-accent);"></span></span>
+                    <span class="stats-pill-divider">·</span>
+                    <span class="stats-pill-xp"><strong id="user-total-xp">0</strong> XP</span>
+                    <span id="rank-display" class="stats-pill-rank" style="display: none;">
+                        <span class="stats-pill-divider">·</span>
+                        #<strong id="rank-popup-num">-</strong>
+                    </span>
+                </button>
+            </div>
 
             <!-- Banner appears only when there's a pending shared link from PWA share_target.
                  Tells the user to pick a group; the link is auto-filled when they enter one. -->
@@ -408,27 +461,21 @@
                 <button class="btn" onclick="clearPendingShare()" style="margin: 0; padding: 6px; font-size: 11px; border-color: #555; color: #888;">Cancel</button>
             </div>
 
-            <div class="card" id="user-stats-card" style="text-align: center; border-color: var(--text-accent);">
-                <p style="margin: 0 0 5px; font-size: 12px; color: #888;">> TOTAL XP EARNED</p>
-                <div style="font-size: 38px; color: var(--text-accent); font-weight: bold; line-height: 1;" id="user-total-xp">0</div>
-                <div id="rank-display" style="display: none; margin: 8px 0 0;">
-                    <span class="rank-text">#<span id="rank-popup-num">-</span> globally</span>
-                </div>
-                <p style="margin: 8px 0 0; font-size: 11px; color: #888;">Across all groups & rounds</p>
-            </div>
-
-            <button class="btn" id="btn-view-global-leaderboard" style="border-color: var(--timer-color); color: var(--timer-color);">View Global Leaderboard</button>
-
-            <button class="btn" id="btn-view-popular" style="border-color: #ff66cc; color: #ff66cc;">🔥 Most Popular Challenges</button>
-
-            <div class="card" id="discover-card" style="border-color: #00ffaa; display: none;">
+            <!-- DISCOVER — moved to the top so it's the first thing the user sees on app open.
+                 Discovery-first homepage pattern (TikTok For You, Instagram Reels): give the
+                 dopamine hit before the chores. Always visible (no display:none) so the user
+                 sees motion immediately even on a fresh app where no rounds exist yet. -->
+            <div class="card discover-hero" id="discover-card" style="border-color: #00ffaa;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                     <h3 style="margin: 0; font-size:14px; color:#00ffaa;">> 🎲 DISCOVER</h3>
                     <button class="btn" id="btn-discover-next" style="margin: 0; padding: 4px 10px; font-size: 11px; width: auto; border-color: #00ffaa; color: #00ffaa; text-transform: uppercase;">↻ Next Drop</button>
                 </div>
-                <p style="font-size: 11px; color: #888; margin: 0 0 10px;">A random winner from across DareDrop. Tap Next for another.</p>
                 <div id="discover-content"></div>
             </div>
+
+            <button class="btn" id="btn-view-popular" style="border-color: #ff66cc; color: #ff66cc;">🔥 See Top 3 Most Popular</button>
+
+            <hr class="home-divider">
 
             <div class="card">
                 <h3 style="margin-top:0; font-size:14px;">> MY GROUPS</h3>
@@ -2341,15 +2388,17 @@
         async function initDiscover() {
             if (discoverState.initialised) return;
             discoverState.initialised = true;
-            const card = document.getElementById('discover-card');
-            // Hidden by default; only revealed if we have at least one item to show.
+            const contentEl = document.getElementById('discover-content');
+            // Show a quick loading placeholder while we fetch — better than empty void.
+            contentEl.innerHTML = `<p style="text-align:center; color:#888; font-size:12px; padding:30px 10px;">Loading drops...</p>`;
             await refillDiscoverPool();
             if (discoverState.pool.length === 0) {
-                // Nothing public-vote-resolved yet anywhere on the platform — keep card hidden.
-                card.style.display = 'none';
+                // Brand new platform / no public-vote rounds anywhere yet. Soft empty state
+                // instead of hiding the card — keeps the home layout stable and signals
+                // "this is where content will appear" rather than confusing the user.
+                contentEl.innerHTML = `<p style="text-align:center; color:#888; font-size:12px; padding:30px 10px;">No public-vote rounds yet. Be the first — start one in your group with public voting on.</p>`;
                 return;
             }
-            card.style.display = 'block';
             showNextDiscover();
         }
 
@@ -2918,9 +2967,9 @@
             document.getElementById('global-leaderboard-overlay').classList.remove('active');
         }
 
-        document.getElementById('btn-view-global-leaderboard').addEventListener('click', () => {
-            window.openGlobalLeaderboardOverlay();
-        });
+        // The compact stats pill in the home header now opens the global leaderboard
+        // directly via inline onclick — the old standalone "View Global Leaderboard"
+        // button has been removed to free vertical space for Discover above the fold.
 
         document.getElementById('btn-view-popular').addEventListener('click', () => {
             openPopularScreen();
