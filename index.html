@@ -196,8 +196,12 @@
         <div id="screen-dashboard" class="screen">
             <h2>GROUP: <span id="display-group"></span></h2>
             
-            <div id="admin-panel" class="card" style="display: none; border-color: var(--admin-color);">
+            <div id="admin-panel" class="card" style="display: none; border-color: var(--admin-color); position: relative;">
                 <h3 style="margin-top:0; font-size:14px; color:var(--admin-color);">> ADMIN PANEL</h3>
+                <p id="admin-lock-notice" style="display: none; font-size: 12px; color: var(--admin-color); border: 1px dashed var(--admin-color); padding: 8px; margin: 0 0 12px; text-align: center;">
+                    🔒 Settings locked while challenge is active. Reroll to draft a new round.
+                </p>
+                <fieldset id="admin-settings-fieldset" style="border: none; padding: 0; margin: 0;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                     <label style="font-size: 14px;">Max Member Capacity:</label>
                     <input type="number" id="max-members-input" style="width: 80px; margin: 0; text-align: center;">
@@ -229,10 +233,8 @@
                     Enable Public Voting
                 </label>
                 <p style="font-size: 11px; color: #888; margin: 5px 0 0 28px;">Anyone with the public link can vote anonymously. Round won't end early - waits for full timer.</p>
-                <p id="admin-lock-notice" style="display: none; font-size: 12px; color: var(--admin-color); border: 1px dashed var(--admin-color); padding: 8px; margin: 12px 0 0; text-align: center;">
-                    🔒 Settings locked while challenge is active. Reroll to draft a new round.
-                </p>
                 <button class="btn btn-admin" id="btn-save-admin" style="padding: 8px; margin-top: 15px; font-size: 14px;">Save Settings</button>
+                </fieldset>
             </div>
 
             <div id="invite-section" class="card" style="border-color: var(--text-accent); text-align: center;">
@@ -756,20 +758,13 @@
 
                 // Lock admin settings while a challenge is active. Unlocks on 'pending' (no round yet)
                 // or 'resolved' (round finished, ready to draft next). Reroll button stays enabled either way.
+                // Using <fieldset disabled> at the browser level — natively disables ALL nested inputs,
+                // checkboxes, and buttons (including <button id="btn-pick-category">) without iterating.
                 const settingsLocked = (status === 'active');
-                const adminInputs = [
-                    'max-members-input',
-                    'challenge-hours-input',
-                    'challenge-mins-input',
-                    'admin-invite-checkbox',
-                    'public-voting-checkbox',
-                    'btn-pick-category',
-                    'btn-save-admin'
-                ];
-                adminInputs.forEach(id => {
-                    const el = document.getElementById(id);
-                    if (el) el.disabled = settingsLocked;
-                });
+                const fieldset = document.getElementById('admin-settings-fieldset');
+                fieldset.disabled = settingsLocked;
+                fieldset.style.opacity = settingsLocked ? '0.45' : '1';
+                fieldset.style.pointerEvents = settingsLocked ? 'none' : 'auto';
                 document.getElementById('admin-lock-notice').style.display = settingsLocked ? 'block' : 'none';
             }
 
