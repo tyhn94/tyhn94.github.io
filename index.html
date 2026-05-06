@@ -271,6 +271,14 @@
 
             <button class="btn" style="border-color: var(--timer-color); color: var(--timer-color);" onclick="window.showHistory()">View Past Challenges</button>
             
+            <div id="superuser-panel" class="card" style="display: none; border-color: #ffd700; background: #1a1500;">
+                <h3 style="margin-top:0; font-size:14px; color:#ffd700;">> 🌟 PREMIUM: CUSTOM CHALLENGE</h3>
+                <p style="font-size: 11px; color: #888; margin: 0 0 10px;">Write your own dare instead of pulling from the category. Starts a fresh round (resets the leaderboard, archives the old challenge).</p>
+                <textarea id="custom-challenge-input" placeholder="e.g., Send a 5-second voice memo of your worst karaoke. No re-takes." rows="3"
+                    style="width: 100%; padding: 10px; background: #000; border: 1px solid #ffd700; color: var(--text-main); font-family: inherit; font-size: 13px; resize: vertical; outline: none; box-sizing: border-box;"></textarea>
+                <button class="btn" id="btn-set-custom-challenge" style="border-color: #ffd700; color: #ffd700; margin-top: 10px;">Set Custom Challenge</button>
+            </div>
+
             <button class="btn btn-admin" id="btn-reroll" style="display: none;">Reroll & Draft New Round</button>
             <button class="btn" style="border-color: #555; color: #555;" onclick="renderMyGroups()">< Back to My Groups</button>
         </div>
@@ -445,6 +453,27 @@
 
         // Kick off the load immediately - auth + UI may already wait for it implicitly.
         loadChallengeData();
+
+        // ─────────────────────────────────────────────────────────────────────
+        // FEATURE GATING — Premium-only features.
+        //
+        // SUPERUSER_NAMES: Manual override list for testers/developers. Compared
+        // case-insensitively against the username. To revoke access, just remove
+        // the name from this array.
+        //
+        // When real premium billing ships, replace the body of isPremiumUser()
+        // with a check on the user document (e.g. userData.isPremium === true)
+        // or a custom claim from Firebase Auth. The rest of the app calls
+        // isPremiumUser() so no other code needs to change.
+        // ─────────────────────────────────────────────────────────────────────
+        const SUPERUSER_NAMES = ['idil1'];
+
+        function isPremiumUser() {
+            if (!currentUserName) return false;
+            if (SUPERUSER_NAMES.includes(currentUserName.toLowerCase())) return true;
+            // Future: if (userData && userData.isPremium === true) return true;
+            return false;
+        }
 
         window.showScreen = function(screenId) {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -743,6 +772,8 @@
 
             document.getElementById('admin-panel').style.display = isAdmin ? 'block' : 'none';
             document.getElementById('btn-reroll').style.display = isAdmin ? 'block' : 'none';
+            // Premium feature gate — custom challenge panel only for admin + premium user.
+            document.getElementById('superuser-panel').style.display = (isAdmin && isPremiumUser()) ? 'block' : 'none';
             
             if(isAdmin) {
                 document.getElementById('max-members-input').value = currentGroupData.maxMembers;
@@ -1224,13 +1255,11 @@
             saveAdminFields({ publicVotingEnabled: e.target.checked });
         });
 
-        document.getElementById('btn-reroll').addEventListener('click', async () => {
-            if(currentGroupData.challengeStatus === 'active' && !confirm("The challenge is still active. Are you sure you want to reroll early?")) {
-                return;
-            }
-
-            document.getElementById('btn-reroll').innerText = "Drafting...";
-            
+        // Shared logic for starting a new round. Used by both reroll (random) and
+        // the premium custom challenge flow. Archives the old challenge into history
+        // (unless we were already pending), resets the leaderboard, clears submissions,
+        // and snaps status back to 'pending' so the admin still has to press START.
+        async function startNewRoundWithChallenge(challengeText) {
             let history = currentGroupData.challengeHistory || [];
             let hIndex = currentGroupData.historyIndex || 0;
 
@@ -1240,7 +1269,6 @@
                     leaderboard: currentGroupData.leaderboard || {},
                     timestamp: Date.now()
                 };
-
                 if (history.length < 5) {
                     history.push(historyItem);
                 } else {
@@ -1252,22 +1280,71 @@
             const newLeaderboard = {};
             currentGroupData.members.forEach(m => newLeaderboard[m] = 0);
 
-            // Pull from the group's selected category. If somehow missing, fall back to first.
-            const activeCatId = currentGroupData.currentCategoryId || challengeData.categories[0].id;
-            const randomTask = getRandomChallengeFromCategory(activeCatId);
-            
             await updateDoc(doc(db, "groups", currentGroupId), {
                 challengeHistory: history,
                 historyIndex: hIndex,
                 leaderboard: newLeaderboard,
-                currentChallenge: randomTask,
-                challengeStartTime: null, 
-                challengeStatus: 'pending', 
-                submissions: {} 
+                currentChallenge: challengeText,
+                challengeStartTime: null,
+                challengeStatus: 'pending',
+                submissions: {}
             });
-            
+        }
+
+        document.getElementById('btn-reroll').addEventListener('click', async () => {
+            if(currentGroupData.challengeStatus === 'active' && !confirm("The challenge is still active. Are you sure you want to reroll early?")) {
+                return;
+            }
+
+            document.getElementById('btn-reroll').innerText = "Drafting...";
+
+            // Pull from the group's selected category. If somehow missing, fall back to first.
+            const activeCatId = currentGroupData.currentCategoryId || challengeData.categories[0].id;
+            const randomTask = getRandomChallengeFromCategory(activeCatId);
+
+            await startNewRoundWithChallenge(randomTask);
+
             document.getElementById('btn-reroll').innerText = "Reroll & Draft New Round";
             refreshGroupData();
+        });
+
+        // Premium-only: set a custom challenge text instead of pulling from the category.
+        // Same round-reset semantics as reroll. Hidden in the UI for non-premium users; this
+        // handler also re-checks isPremiumUser() defensively in case the panel was force-shown.
+        document.getElementById('btn-set-custom-challenge').addEventListener('click', async () => {
+            if (!isPremiumUser()) {
+                alert("This feature is for premium users only.");
+                return;
+            }
+            const textarea = document.getElementById('custom-challenge-input');
+            const text = textarea.value.trim();
+            if (text.length < 5) {
+                alert("Custom challenge needs to be at least 5 characters. Be specific.");
+                return;
+            }
+            if (text.length > 500) {
+                alert("Keep it under 500 characters. Edit it down.");
+                return;
+            }
+            if (currentGroupData.challengeStatus === 'active' &&
+                !confirm("The challenge is still active. Are you sure you want to override it with a custom one?")) {
+                return;
+            }
+
+            const btn = document.getElementById('btn-set-custom-challenge');
+            btn.innerText = "Setting...";
+            btn.disabled = true;
+            try {
+                await startNewRoundWithChallenge(text);
+                textarea.value = "";
+                refreshGroupData();
+            } catch (e) {
+                console.error("[custom challenge]", e);
+                alert("Couldn't set custom challenge. Try again.");
+            } finally {
+                btn.innerText = "Set Custom Challenge";
+                btn.disabled = false;
+            }
         });
 
         window.kickMember = async function(targetName) {
