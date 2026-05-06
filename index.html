@@ -1261,10 +1261,16 @@
 
             // Flatten submissions into a sorted array. Only people who actually submitted
             // get a card slot — non-participants aren't relevant to the popular feed.
+            // Vote count merges BOTH sources of truth:
+            //   - .votes      → in-group member votes      (key: voter username)
+            //   - .publicVotes → anonymous public-link votes (key: anonymous voter id)
+            // XP already aggregates both via leaderboard increments at vote time, so we
+            // pull XP straight from the leaderboard without re-summing.
             const submissionsArr = Object.keys(submissionsObj).map(username => {
                 const sub = submissionsObj[username];
-                const votes = sub.votes || {};
-                const voteCount = Object.keys(votes).length;
+                const memberVotes = sub.votes || {};
+                const publicVotes = sub.publicVotes || {};
+                const voteCount = Object.keys(memberVotes).length + Object.keys(publicVotes).length;
                 const xp = leaderboard[username] || 0;
                 return {
                     username,
