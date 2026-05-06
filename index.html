@@ -2392,24 +2392,28 @@
             const contentEl = document.getElementById('discover-content');
             if (!contentEl) return;
 
-            // Pool exhausted? Try to refill (server round-trip). If still empty, show a
-            // gentle "you've seen them all" state instead of looping the same items.
+            // Pool exhausted? Refill from server in case new rounds completed since last fetch.
+            // If the refill comes back with fresh items, great. If everything's still old (we've
+            // seen them all this session), recycle: clear seenIds and reshuffle the pool so the
+            // user gets another drop. Endless feed psychology — never hit a wall, never let the
+            // user feel like content is finite. With pool size 30, repeats are rare in practice
+            // (most sessions don't tap that many times) and feel like coincidence, not exhaustion.
             if (discoverState.pool.length === 0) {
-                if (discoverState.seenIds.size > 0) {
-                    // Refill from server in case new rounds completed since last fetch.
-                    contentEl.innerHTML = `<p style="text-align:center; color:#888; font-size:12px; padding:20px 0;">Loading...</p>`;
-                    refillDiscoverPool().then(() => {
-                        // Filter out already-seen items so refill feels fresh.
-                        discoverState.pool = discoverState.pool.filter(x => !discoverState.seenIds.has(x._id));
-                        if (discoverState.pool.length === 0) {
-                            contentEl.innerHTML = `<p style="text-align:center; color:#888; font-size:12px; padding:20px 0;">You've seen all the recent drops. Check back later for fresh ones.</p>`;
-                        } else {
-                            showNextDiscover();
-                        }
-                    });
-                    return;
-                }
-                contentEl.innerHTML = `<p style="text-align:center; color:#888; font-size:12px; padding:20px 0;">No drops yet.</p>`;
+                contentEl.innerHTML = `<p style="text-align:center; color:#888; font-size:12px; padding:20px 0;">Loading...</p>`;
+                refillDiscoverPool().then(() => {
+                    // Filter out items we've already shown this session for freshness.
+                    const fresh = discoverState.pool.filter(x => !discoverState.seenIds.has(x._id));
+                    if (fresh.length > 0) {
+                        discoverState.pool = fresh;
+                    } else {
+                        // Everything in the latest fetch has been shown. Recycle: keep the pool
+                        // (re-shuffled by refillDiscoverPool) and reset seenIds so future taps
+                        // see them as "new" again. The user will get repeats, but with 30 items
+                        // and a typical session, they likely won't notice the same one twice.
+                        discoverState.seenIds.clear();
+                    }
+                    showNextDiscover();
+                });
                 return;
             }
 
