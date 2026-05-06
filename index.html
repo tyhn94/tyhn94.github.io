@@ -148,8 +148,40 @@
         .filter-select option { background: #111; color: var(--text-main); }
 
         .popular-card {
-            border: 1px solid #444; padding: 10px; margin-bottom: 10px;
+            border: 1px solid #444; padding: 0; margin-bottom: 14px;
             background: rgba(255, 102, 204, 0.04); animation: fadeIn 0.3s ease-out;
+            position: relative; /* establishes containing block for sticky children */
+        }
+        /* Sticky context bar — pinned to the container's scroll top while the card is in view.
+           Anchored to .container's overflow context (max-height: 95vh, overflow-y: auto).
+           When the next card scrolls into view, ITS sticky pushes this one out — natural handoff. */
+        .popular-card .pop-sticky {
+            position: sticky; top: 0; z-index: 5;
+            background: #0a0a0a;
+            padding: 8px 10px;
+            border-bottom: 1px solid #222;
+        }
+        /* Tier accent stripe on the left edge of the sticky — gold/silver/bronze
+           is the primary "where am I?" cue, visible at a glance even if text is small. */
+        .popular-card.tier-1 .pop-sticky { border-left: 4px solid #ffd700; } /* gold */
+        .popular-card.tier-2 .pop-sticky { border-left: 4px solid #c0c0c0; } /* silver */
+        .popular-card.tier-3 .pop-sticky { border-left: 4px solid #cd7f32; } /* bronze */
+        .popular-card .pop-sticky-row {
+            display: flex; align-items: center; gap: 8px; margin-bottom: 4px;
+        }
+        .popular-card .pop-rank-badge {
+            display: inline-block; padding: 2px 8px; font-size: 11px; font-weight: bold;
+            letter-spacing: 1px; border: 1px solid currentColor; flex-shrink: 0;
+        }
+        .popular-card.tier-1 .pop-rank-badge { color: #ffd700; }
+        .popular-card.tier-2 .pop-rank-badge { color: #c0c0c0; }
+        .popular-card.tier-3 .pop-rank-badge { color: #cd7f32; }
+        .popular-card .pop-context {
+            font-size: 11px; color: #888;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0;
+        }
+        .popular-card .pop-time {
+            font-size: 11px; color: #666; flex-shrink: 0;
         }
         .popular-card .pop-rank {
             font-size: 18px; margin-right: 6px;
@@ -159,11 +191,14 @@
             font-size: 11px; color: #888; margin-bottom: 6px;
         }
         .popular-card .pop-challenge {
-            font-size: 13px; color: var(--text-main); margin: 6px 0;
+            font-size: 13px; color: var(--text-main); margin: 0;
             line-height: 1.4;
+            /* Cap height inside the sticky bar so a long challenge doesn't eat the screen. */
+            max-height: 3.6em; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
         }
+        .popular-card .pop-body { padding: 10px; }
         .popular-card .pop-meta {
-            font-size: 11px; color: #888; margin-top: 6px;
+            font-size: 11px; color: #888; margin: 0 0 10px;
             display: flex; gap: 12px; flex-wrap: wrap;
         }
         .popular-card .pop-meta strong { color: var(--text-accent); }
@@ -2275,11 +2310,16 @@
                 return;
             }
 
-            const medals = ['🥇', '🥈', '🥉'];
-            listEl.innerHTML = filtered.map((item, idx) => renderPopularCard(item, medals[idx])).join('');
+            // Pass the index, not a medal emoji — renderPopularCard derives gold/silver/bronze
+            // styling from the tier (idx + 1) for the sticky header accent.
+            listEl.innerHTML = filtered.map((item, idx) => renderPopularCard(item, idx)).join('');
         }
 
-        function renderPopularCard(item, medal) {
+        function renderPopularCard(item, idx) {
+            const rankLabels = ['#1 GOLD', '#2 SILVER', '#3 BRONZE'];
+            const tier = idx + 1; // 1, 2, 3
+            const rankLabel = rankLabels[idx] || `#${tier}`;
+
             const customBadge = item.isCustom
                 ? `<span class="pop-custom-badge">⭐ CUSTOM by ${escapeHtml(item.customAuthor || '?')}</span>`
                 : '';
@@ -2295,24 +2335,34 @@
                     </div>`;
             }).join('');
 
+            // Card structure:
+            //   .pop-sticky (sticks while card is in view) → rank badge + category/group + challenge text
+            //   .pop-body (scrolls normally)              → meta row + submissions (embeds)
+            // The sticky bar carries everything the user needs to keep oriented while scrolling
+            // through the embeds. The body is freely scrollable beneath it.
             return `
-                <div class="popular-card">
-                    <div class="pop-header">
-                        <span><span class="pop-rank">${medal}</span> ${escapeHtml(item.categoryEmoji || '🎲')} <strong>${escapeHtml(item.categoryName || 'Category')}</strong> · in <strong>${escapeHtml(item.groupName || 'group')}</strong>${customBadge}</span>
-                        <span>${formatRelativeTime(item.completedAt)}</span>
+                <div class="popular-card tier-${tier}">
+                    <div class="pop-sticky">
+                        <div class="pop-sticky-row">
+                            <span class="pop-rank-badge">${rankLabel}</span>
+                            <span class="pop-context">${escapeHtml(item.categoryEmoji || '🎲')} <strong>${escapeHtml(item.categoryName || 'Category')}</strong> · in <strong>${escapeHtml(item.groupName || 'group')}</strong>${customBadge}</span>
+                            <span class="pop-time">${formatRelativeTime(item.completedAt)}</span>
+                        </div>
+                        <div class="pop-challenge">"${escapeHtml(item.challengeText || '')}"</div>
                     </div>
-                    <div class="pop-challenge">"${escapeHtml(item.challengeText || '')}"</div>
-                    <div class="pop-meta">
-                        <span><strong>${item.totalXP || 0}</strong> XP</span>
-                        <span><strong>${item.totalVotes || 0}</strong> public votes</span>
-                        <span><strong>${item.participantCount || 0}</strong> participants</span>
+                    <div class="pop-body">
+                        <div class="pop-meta">
+                            <span><strong>${item.totalXP || 0}</strong> XP</span>
+                            <span><strong>${item.totalVotes || 0}</strong> public votes</span>
+                            <span><strong>${item.participantCount || 0}</strong> participants</span>
+                        </div>
+                        ${subsHtml ? `<div class="pop-submissions">
+                            ${item.participantCount > (item.submissions || []).length
+                                ? `<p style="font-size: 10px; color: #888; margin: 0 0 6px; text-transform: uppercase; letter-spacing: 1px;">Top ${(item.submissions || []).length} of ${item.participantCount}</p>`
+                                : ''}
+                            ${subsHtml}
+                        </div>` : ''}
                     </div>
-                    ${subsHtml ? `<div class="pop-submissions">
-                        ${item.participantCount > (item.submissions || []).length
-                            ? `<p style="font-size: 10px; color: #888; margin: 0 0 6px; text-transform: uppercase; letter-spacing: 1px;">Top ${(item.submissions || []).length} of ${item.participantCount}</p>`
-                            : ''}
-                        ${subsHtml}
-                    </div>` : ''}
                 </div>`;
         }
 
