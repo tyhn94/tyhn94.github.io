@@ -260,6 +260,25 @@
             text-transform: uppercase; letter-spacing: 1px;
         }
         .popular-card .pop-expand-btn:hover { color: #fff; }
+
+        /* DISCOVER card — single random winner with slot-machine refresh.
+           Green accent distinguishes it from the pink Most Popular section visually. */
+        #discover-card .discover-context {
+            display: flex; justify-content: space-between; align-items: center; gap: 8px;
+            font-size: 11px; color: #888; margin-bottom: 6px;
+        }
+        #discover-card .discover-context > span:first-child {
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0;
+        }
+        #discover-card .discover-challenge {
+            font-size: 13px; color: var(--text-main); margin: 6px 0 10px;
+            line-height: 1.4;
+        }
+        #discover-card .discover-winner {
+            display: flex; align-items: center; gap: 8px;
+            margin-bottom: 8px; font-size: 12px;
+        }
+        #discover-card #btn-discover-next:hover { background: #00ffaa; color: var(--bg-color); }
         .popular-card .pop-sub-embed {
             width: 100%; background: #000; overflow: hidden; border: 1px solid #222;
             /* Becomes the positioning context for the fallback layer that sits behind the iframe. */
@@ -377,6 +396,15 @@
             <button class="btn" id="btn-view-global-leaderboard" style="border-color: var(--timer-color); color: var(--timer-color);">View Global Leaderboard</button>
 
             <button class="btn" id="btn-view-popular" style="border-color: #ff66cc; color: #ff66cc;">🔥 Most Popular Challenges</button>
+
+            <div class="card" id="discover-card" style="border-color: #00ffaa; display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <h3 style="margin: 0; font-size:14px; color:#00ffaa;">> 🎲 DISCOVER</h3>
+                    <button class="btn" id="btn-discover-next" style="margin: 0; padding: 4px 10px; font-size: 11px; width: auto; border-color: #00ffaa; color: #00ffaa; text-transform: uppercase;">↻ Next Drop</button>
+                </div>
+                <p style="font-size: 11px; color: #888; margin: 0 0 10px;">A random winner from across DareDrop. Tap Next for another.</p>
+                <div id="discover-content"></div>
+            </div>
 
             <div class="card">
                 <h3 style="margin-top:0; font-size:14px;">> MY GROUPS</h3>
@@ -835,6 +863,11 @@
 
             // Kick off global stats in parallel - don't block group rendering on it.
             loadGlobalStats();
+
+            // Discover card init — fetches a pool of random rounds, shows the first one.
+            // initDiscover is idempotent: only runs once per session, so re-renders of
+            // My Groups (e.g., after creating a group) don't reshuffle the pool.
+            initDiscover();
 
             // If a shared link is waiting (from PWA share_target), surface the banner so
             // the user knows what'll happen when they tap a group.
@@ -2267,6 +2300,124 @@
         }
 
         // ============================================================
+        // DISCOVER - one-shot random winner card on the My Groups screen.
+        // Slot-machine UX (each "Next Drop" = unpredictable content) without
+        // the cognitive load of an endless feed. Pool is fetched once per
+        // session and shuffled client-side, so the first 30 taps are zero
+        // additional reads.
+        // ============================================================
+        const discoverState = {
+            pool: [],          // Shuffled queue of indexed rounds (full submissions arrays)
+            seenIds: new Set(),// Items shown in this session — avoid immediate repeats on refill
+            initialised: false,
+            loading: false
+        };
+        const DISCOVER_POOL_SIZE = 30; // Fetch this many at a time. ~5 cents per 1000 active users.
+
+        async function initDiscover() {
+            if (discoverState.initialised) return;
+            discoverState.initialised = true;
+            const card = document.getElementById('discover-card');
+            // Hidden by default; only revealed if we have at least one item to show.
+            await refillDiscoverPool();
+            if (discoverState.pool.length === 0) {
+                // Nothing public-vote-resolved yet anywhere on the platform — keep card hidden.
+                card.style.display = 'none';
+                return;
+            }
+            card.style.display = 'block';
+            showNextDiscover();
+        }
+
+        async function refillDiscoverPool() {
+            if (discoverState.loading) return;
+            discoverState.loading = true;
+            try {
+                // Pull the most recent batch. Recency bias is a feature: stale 6-month-old
+                // content shouldn't dominate Discover — week-old viral wins should.
+                const q = query(
+                    collection(db, "popularChallenges"),
+                    orderBy("completedAt", "desc"),
+                    limit(DISCOVER_POOL_SIZE)
+                );
+                const snap = await getDocs(q);
+                const items = [];
+                snap.forEach(d => {
+                    const data = d.data();
+                    // Only keep items that actually have a top submission to show — empty
+                    // rounds (no one submitted) aren't interesting in a Discover slot.
+                    if (data.submissions && data.submissions.length > 0) {
+                        items.push({ ...data, _id: d.id });
+                    }
+                });
+                // Fisher-Yates shuffle so the order isn't always "most recent first".
+                for (let i = items.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [items[i], items[j]] = [items[j], items[i]];
+                }
+                discoverState.pool = items;
+            } catch (e) {
+                console.error("[discover] refill failed:", e);
+                discoverState.pool = [];
+            } finally {
+                discoverState.loading = false;
+            }
+        }
+
+        function showNextDiscover() {
+            const contentEl = document.getElementById('discover-content');
+            if (!contentEl) return;
+
+            // Pool exhausted? Try to refill (server round-trip). If still empty, show a
+            // gentle "you've seen them all" state instead of looping the same items.
+            if (discoverState.pool.length === 0) {
+                if (discoverState.seenIds.size > 0) {
+                    // Refill from server in case new rounds completed since last fetch.
+                    contentEl.innerHTML = `<p style="text-align:center; color:#888; font-size:12px; padding:20px 0;">Loading...</p>`;
+                    refillDiscoverPool().then(() => {
+                        // Filter out already-seen items so refill feels fresh.
+                        discoverState.pool = discoverState.pool.filter(x => !discoverState.seenIds.has(x._id));
+                        if (discoverState.pool.length === 0) {
+                            contentEl.innerHTML = `<p style="text-align:center; color:#888; font-size:12px; padding:20px 0;">You've seen all the recent drops. Check back later for fresh ones.</p>`;
+                        } else {
+                            showNextDiscover();
+                        }
+                    });
+                    return;
+                }
+                contentEl.innerHTML = `<p style="text-align:center; color:#888; font-size:12px; padding:20px 0;">No drops yet.</p>`;
+                return;
+            }
+
+            const item = discoverState.pool.pop();
+            discoverState.seenIds.add(item._id);
+            contentEl.innerHTML = renderDiscoverCard(item);
+        }
+
+        function renderDiscoverCard(item) {
+            // Show only the #1 submission — Discover is a single-card slot, not a podium.
+            // Top submission has the most "wow" factor and respects scroll real estate.
+            const winner = item.submissions[0];
+            const customBadge = item.isCustom
+                ? `<span class="pop-custom-badge">⭐ CUSTOM by ${escapeHtml(item.customAuthor || '?')}</span>`
+                : '';
+
+            return `
+                <div class="discover-context">
+                    <span>${escapeHtml(item.categoryEmoji || '🎲')} <strong>${escapeHtml(item.categoryName || 'Category')}</strong> · in <strong>${escapeHtml(item.groupName || 'group')}</strong>${customBadge}</span>
+                    <span style="color:#666; font-size: 11px;">${formatRelativeTime(item.completedAt)}</span>
+                </div>
+                <div class="discover-challenge">"${escapeHtml(item.challengeText || '')}"</div>
+                <div class="discover-winner">
+                    <span class="pop-sub-rank rank-1">🏆 #1</span>
+                    <strong style="color:var(--text-accent);">${escapeHtml(winner.username)}</strong>
+                    <span style="color:#888; font-size: 11px; margin-left:auto;">${winner.voteCount} 🌐 · ${winner.xp} XP</span>
+                </div>
+                <div class="pop-sub-embed">${renderEmbed(winner.link)}</div>
+            `;
+        }
+
+        // ============================================================
         // MOST POPULAR FEED - global discovery on the My Groups screen.
         // Indexes only public-voting rounds; deterministic doc IDs make
         // the indexer idempotent (see indexResolvedRoundForPopularFeed).
@@ -2735,6 +2886,10 @@
 
         document.getElementById('btn-view-popular').addEventListener('click', () => {
             openPopularScreen();
+        });
+
+        document.getElementById('btn-discover-next').addEventListener('click', () => {
+            showNextDiscover();
         });
 
         function openPopularScreen() {
