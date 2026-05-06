@@ -1571,33 +1571,49 @@
             refreshGroupData();
         }
 
-        // Generic share helper — uses native OS share sheet when available (one tap to
-        // WhatsApp / Messages / Telegram on mobile), falls back to clipboard otherwise.
-        // Resolves silently on user-cancel so callers don't show an error toast for that.
+        // Generic share helper — opens the native OS share sheet (one tap to WhatsApp /
+        // Messages / Telegram on mobile) AND writes to clipboard in parallel. The clipboard
+        // copy gives the user a fallback if they dismiss the share sheet, want to paste
+        // somewhere else, or are on desktop without Web Share API.
+        //
+        // Order matters: clipboard writeText is started BEFORE awaiting share so it stays
+        // inside the original user-gesture context (some browsers tighten clipboard perms
+        // once the gesture is "consumed" by an await).
         async function shareOrCopy({ title, text, url, copyMessage, btnEl }) {
             const originalLabel = btnEl ? btnEl.innerText : null;
+
+            // Fire-and-track clipboard write in parallel.
+            let clipboardOk = false;
+            const clipPromise = navigator.clipboard.writeText(url)
+                .then(() => { clipboardOk = true; })
+                .catch((e) => { console.warn('[share] clipboard write failed:', e); });
+
+            // Try native share sheet on top of that.
+            let shareDone = false;
             try {
                 if (navigator.share) {
                     await navigator.share({ title, text, url });
-                    return; // Native sheet handled it.
+                    shareDone = true;
                 }
             } catch (err) {
-                // AbortError = user dismissed the share sheet. Stay silent.
-                if (err && err.name === 'AbortError') return;
-                // Other errors fall through to clipboard.
-                console.warn('[share] native share failed, falling back to clipboard:', err);
+                // AbortError = user dismissed the share sheet — that's fine, clipboard is filled.
+                if (!(err && err.name === 'AbortError')) {
+                    console.warn('[share] native share failed:', err);
+                }
             }
 
-            // Fallback: clipboard + alert. Used on desktop browsers and older mobile.
-            try {
-                await navigator.clipboard.writeText(url);
-                if (btnEl) {
-                    btnEl.innerText = '✓ Copied — paste in your chat';
-                    setTimeout(() => { btnEl.innerText = originalLabel; }, 2200);
-                } else {
-                    alert(copyMessage + "\n" + url);
-                }
-            } catch (e) {
+            // Wait for clipboard so feedback is accurate.
+            await clipPromise;
+
+            // Confirm copy on the button so the user knows it's also on the clipboard,
+            // regardless of whether they completed the share, dismissed it, or had no
+            // share API at all. Briefly flash, then restore.
+            if (btnEl && clipboardOk) {
+                btnEl.innerText = '✓ Link copied';
+                clearTimeout(btnEl._shareResetTimer);
+                btnEl._shareResetTimer = setTimeout(() => { btnEl.innerText = originalLabel; }, 2200);
+            } else if (!shareDone && !clipboardOk) {
+                // Both paths failed (no share API, clipboard denied) — last resort.
                 alert(copyMessage + "\n" + url);
             }
         }
