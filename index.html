@@ -262,6 +262,26 @@
         .popular-card .pop-expand-btn:hover { color: #fff; }
         .popular-card .pop-sub-embed {
             width: 100%; background: #000; overflow: hidden; border: 1px solid #222;
+            /* Becomes the positioning context for the fallback layer that sits behind the iframe. */
+            position: relative; min-height: 120px;
+        }
+        /* Backdrop layer behind every embed iframe. While the iframe loads OR if the post
+           was deleted (third-party platforms still serve a "not found" page → iframe stays
+           visually empty or collapses), this message is what the user sees. When the iframe
+           loads successfully, it sits on top and covers the message — no flash, no flicker.
+           This is intentionally framed as soft uncertainty ("may be unavailable") rather
+           than asserting the post is gone — a valid embed mid-load shouldn't lie to the user. */
+        .embed-fallback-layer {
+            position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+            text-align: center; padding: 20px; font-size: 12px; color: #888;
+            line-height: 1.5; pointer-events: none;
+            background: repeating-linear-gradient(45deg, transparent, transparent 12px, rgba(255,102,204,0.04) 12px, rgba(255,102,204,0.04) 24px);
+        }
+        .embed-fallback-layer strong { color: #aaa; display: block; margin-bottom: 4px; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; }
+        .embed-fallback-layer a { color: var(--timer-color); pointer-events: auto; word-break: break-all; }
+        /* Iframe sits on top of the fallback layer. */
+        .embed-iframe, .embed-image, .embed-video {
+            position: relative; z-index: 1;
         }
         /* Embed iframes — let each platform pick its own height since their aspect ratios differ.
            Width always fills the container, max-width ensures we don't blow past the card on desktop. */
@@ -2485,6 +2505,25 @@
         // with 9 embedded posts (3 cards × ~3 subs) doesn't hammer the network on first paint.
         // Keep this list focused on the platforms actual users post to — adding more later
         // is a one-liner per platform.
+        //
+        // DELETED-POST FALLBACK: Every iframe is rendered with a fallback message layer
+        // BEHIND it. If the post still exists, the iframe loads on top and covers the
+        // message — invisible. If the post was deleted, the iframe collapses or shows an
+        // empty/error state, and the message stays visible. We can't detect deletion in
+        // JS (cross-origin iframes are opaque), so this passive layering is the cleanest
+        // solution: zero false positives during loading, graceful degradation on actual loss.
+        function withFallback(embedHtml, originalUrl) {
+            const fallback = `
+                <div class="embed-fallback-layer">
+                    <div>
+                        <strong>Post unavailable</strong>
+                        If you're seeing this, the original post may have been removed or set to private.<br>
+                        <a href="${escapeHtml(originalUrl)}" target="_blank" rel="noopener noreferrer">Try opening directly ↗</a>
+                    </div>
+                </div>`;
+            return fallback + embedHtml;
+        }
+
         function renderEmbed(url) {
             if (!url) return '<span style="color:#555; font-size:11px;">— no link submitted —</span>';
 
@@ -2498,7 +2537,7 @@
                 if (m) {
                     const kind = m[1] === 'reels' ? 'reel' : m[1];
                     const embedUrl = `https://www.instagram.com/${kind}/${m[2]}/embed/`;
-                    return `<iframe src="${embedUrl}" class="embed-iframe embed-instagram" loading="lazy" frameborder="0" scrolling="no" allowtransparency="true" allowfullscreen></iframe>`;
+                    return withFallback(`<iframe src="${embedUrl}" class="embed-iframe embed-instagram" loading="lazy" frameborder="0" scrolling="no" allowtransparency="true" allowfullscreen></iframe>`, url);
                 }
             }
 
@@ -2515,7 +2554,7 @@
                     }
                 }
                 if (videoId) {
-                    return `<iframe src="https://www.youtube.com/embed/${encodeURIComponent(videoId)}" class="embed-iframe embed-youtube" loading="lazy" frameborder="0" allow="accelerometer; clipboard-write; encrypted-media; picture-in-picture" allowfullscreen></iframe>`;
+                    return withFallback(`<iframe src="https://www.youtube.com/embed/${encodeURIComponent(videoId)}" class="embed-iframe embed-youtube" loading="lazy" frameborder="0" allow="accelerometer; clipboard-write; encrypted-media; picture-in-picture" allowfullscreen></iframe>`, url);
                 }
             }
 
@@ -2523,7 +2562,7 @@
             if (host === 'tiktok.com' || host.endsWith('.tiktok.com')) {
                 const m = u.pathname.match(/\/video\/(\d+)/);
                 if (m) {
-                    return `<iframe src="https://www.tiktok.com/embed/v2/${m[1]}" class="embed-iframe embed-tiktok" loading="lazy" frameborder="0" allow="encrypted-media" allowfullscreen scrolling="no"></iframe>`;
+                    return withFallback(`<iframe src="https://www.tiktok.com/embed/v2/${m[1]}" class="embed-iframe embed-tiktok" loading="lazy" frameborder="0" allow="encrypted-media" allowfullscreen scrolling="no"></iframe>`, url);
                 }
             }
 
@@ -2532,18 +2571,19 @@
             if (host === 'twitter.com' || host === 'x.com' || host.endsWith('.twitter.com') || host.endsWith('.x.com')) {
                 if (/\/status\/\d+/.test(u.pathname)) {
                     const embedUrl = `https://twitframe.com/show?url=${encodeURIComponent(url)}`;
-                    return `<iframe src="${embedUrl}" class="embed-iframe embed-twitter" loading="lazy" frameborder="0" scrolling="no"></iframe>`;
+                    return withFallback(`<iframe src="${embedUrl}" class="embed-iframe embed-twitter" loading="lazy" frameborder="0" scrolling="no"></iframe>`, url);
                 }
             }
 
-            // Direct image URL — render as <img>.
+            // Direct image URL — render as <img>. onerror reveals the fallback layer
+            // (sets opacity to 0 so the underlying message becomes visible).
             if (/\.(jpg|jpeg|png|gif|webp|avif)(\?.*)?$/i.test(u.pathname)) {
-                return `<img src="${escapeHtml(url)}" class="embed-image" alt="submission" loading="lazy">`;
+                return withFallback(`<img src="${escapeHtml(url)}" class="embed-image" alt="submission" loading="lazy" onerror="this.style.opacity='0';">`, url);
             }
 
-            // Direct video URL — render as <video>.
+            // Direct video URL — render as <video>. Same onerror trick.
             if (/\.(mp4|webm|mov|m4v)(\?.*)?$/i.test(u.pathname)) {
-                return `<video src="${escapeHtml(url)}" class="embed-video" controls preload="metadata"></video>`;
+                return withFallback(`<video src="${escapeHtml(url)}" class="embed-video" controls preload="metadata" onerror="this.style.opacity='0';"></video>`, url);
             }
 
             return embedLinkFallback(url);
