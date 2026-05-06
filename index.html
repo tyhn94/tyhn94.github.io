@@ -939,8 +939,17 @@
             // The check mirrors resolveChallengeAndKick's per-member logic.
             // SKIPPED when public voting is enabled - round must wait for full timer
             // so external voters get the entire window to weigh in.
+            //
+            // ADMIN EXEMPTION: the admin is protected from kicks (see resolveChallengeAndKick),
+            // so requiring their participation here would deadlock the round whenever the admin
+            // sits out. Skip the admin in the completeness check — non-admins finishing among
+            // themselves is enough to trigger early resolution.
             if (status === 'active' && currentGroupData.members.length > 0 && !currentGroupData.publicVotingEnabled) {
-                const allComplete = currentGroupData.members.every(member => {
+                const adminName = currentGroupData.adminName;
+                const playingMembers = currentGroupData.members.filter(m => m !== adminName);
+                // Need at least one non-admin player; otherwise (admin alone, or admin + nobody)
+                // there's nothing to early-resolve.
+                const allComplete = playingMembers.length > 0 && playingMembers.every(member => {
                     if (!submissions[member]) return false;
                     const others = Object.keys(submissions).filter(m => m !== member);
                     if (others.length === 0) return true; // no one else submitted yet
@@ -1033,13 +1042,28 @@
                 document.getElementById('time-remaining-display').innerText = "00:00:00";
                 
                 if (isAdmin) {
-                    interactionDiv.innerHTML = `<button class="btn btn-admin" style="font-size: 18px; padding: 15px;" onclick="startChallengeNow()">START CHALLENGE</button>`;
+                    // Need at least one other member before the round can start — single-person
+                    // groups can't actually play (no one to vote on, no one to vote for).
+                    if (currentGroupData.members.length < 2) {
+                        interactionDiv.innerHTML = `
+                            <p style="color: var(--admin-color); font-size: 13px; text-align: center; padding: 12px; border: 1px dashed var(--admin-color);">
+                                Invite at least one more person to start the round.
+                            </p>`;
+                    } else {
+                        interactionDiv.innerHTML = `<button class="btn btn-admin" style="font-size: 18px; padding: 15px;" onclick="startChallengeNow()">START CHALLENGE</button>`;
+                    }
                 }
             } else if (status === 'resolved') {
                 statusEl.innerText = "ROUND OVER! Waiting for admin to draft new round.";
                 statusEl.style.color = "#888";
             } else {
-                if (isSafe) {
+                // Admin gets a different framing: they're protected from kicks (so the
+                // "or you'll get kicked!" stick doesn't apply), but the carrot of XP still
+                // motivates them to play. Non-admins see the original survive-or-die framing.
+                if (isAdmin) {
+                    statusEl.innerText = "👑 ADMIN: Play to earn XP (you can't be kicked).";
+                    statusEl.style.color = "var(--admin-color)";
+                } else if (isSafe) {
                     statusEl.innerText = "✅ YOU ARE SAFE FROM THE KICK.";
                     statusEl.style.color = "var(--text-main)";
                 } else if (!hasSubmitted) {
@@ -1129,6 +1153,11 @@
         }
 
         window.startChallengeNow = async function() {
+            // Defensive: even if the start button was force-shown via devtools, refuse to start solo.
+            if (!currentGroupData || (currentGroupData.members || []).length < 2) {
+                alert("You need at least 2 members in the group to start a challenge.");
+                return;
+            }
             if(!confirm("Start the countdown for everyone now?")) return;
             await updateDoc(doc(db, "groups", currentGroupId), {
                 challengeStatus: 'active',
@@ -1366,9 +1395,20 @@
             if (data.challengeStatus !== 'active') return; 
 
             const submissions = data.submissions || {};
+            const adminName = data.adminName;
             const survivingMembers = [];
 
             data.members.forEach(member => {
+                // ADMIN PROTECTION: the group's admin is the owner — they can't be removed
+                // from their own group regardless of participation. Mirrors how Discord/Slack
+                // treat workspace owners. They still earn no XP if they didn't submit/vote
+                // (the leaderboard naturally records 0 for non-participants), so the rule
+                // protects ownership without giving a competitive advantage.
+                if (member === adminName) {
+                    survivingMembers.push(member);
+                    return;
+                }
+
                 const hasSubmitted = !!submissions[member];
                 const otherSubmissions = Object.keys(submissions).filter(m => m !== member);
                 let hasVoted = (otherSubmissions.length === 0);
