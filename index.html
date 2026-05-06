@@ -1261,16 +1261,19 @@
 
             // Flatten submissions into a sorted array. Only people who actually submitted
             // get a card slot — non-participants aren't relevant to the popular feed.
-            // Vote count merges BOTH sources of truth:
-            //   - .votes      → in-group member votes      (key: voter username)
-            //   - .publicVotes → anonymous public-link votes (key: anonymous voter id)
-            // XP already aggregates both via leaderboard increments at vote time, so we
-            // pull XP straight from the leaderboard without re-summing.
+            //
+            // VOTE SEMANTICS: We count ONLY publicVotes (anonymous outsider votes via the
+            // public link), not in-group member votes. Reasoning: in-group voting is mandatory
+            // (members get kicked if they don't vote), so member-vote counts mostly track group
+            // size, not popularity. publicVotes are the real signal of outside engagement and
+            // match the "Most Popular" feed's semantics — discovery-worthiness, not group activity.
+            //
+            // XP still reflects BOTH sources (it's pulled from the leaderboard, which both vote
+            // types increment). XP = quality/score; voteCount = public reach.
             const submissionsArr = Object.keys(submissionsObj).map(username => {
                 const sub = submissionsObj[username];
-                const memberVotes = sub.votes || {};
                 const publicVotes = sub.publicVotes || {};
-                const voteCount = Object.keys(memberVotes).length + Object.keys(publicVotes).length;
+                const voteCount = Object.keys(publicVotes).length;
                 const xp = leaderboard[username] || 0;
                 return {
                     username,
@@ -1976,7 +1979,7 @@
                     <div class="pop-sub-block">
                         <div class="pop-sub-head">
                             <strong style="color:var(--text-accent);">${escapeHtml(s.username)}</strong>
-                            <span style="color:#888; white-space:nowrap;">${s.voteCount} 🗳 · ${s.xp} XP</span>
+                            <span style="color:#888; white-space:nowrap;">${s.voteCount} 🌐 · ${s.xp} XP</span>
                         </div>
                         <div class="pop-sub-embed">${renderEmbed(s.link)}</div>
                     </div>`;
@@ -1991,7 +1994,7 @@
                     <div class="pop-challenge">"${escapeHtml(item.challengeText || '')}"</div>
                     <div class="pop-meta">
                         <span><strong>${item.totalXP || 0}</strong> XP</span>
-                        <span><strong>${item.totalVotes || 0}</strong> votes</span>
+                        <span><strong>${item.totalVotes || 0}</strong> public votes</span>
                         <span><strong>${item.participantCount || 0}</strong> participants</span>
                     </div>
                     ${subsHtml ? `<div class="pop-submissions">${subsHtml}</div>` : ''}
