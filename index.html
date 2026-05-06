@@ -113,6 +113,54 @@
         }
         .category-current-pill:hover { background: var(--admin-color); color: var(--bg-color); }
 
+        /* Most Popular feed: chips + cards */
+        .chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
+        .filter-chip {
+            padding: 4px 10px; font-size: 12px; font-family: inherit;
+            background: transparent; border: 1px solid #555; color: #aaa;
+            cursor: pointer; transition: all 0.15s;
+        }
+        .filter-chip:hover { border-color: #ff66cc; color: #ff66cc; }
+        .filter-chip.active { border-color: #ff66cc; background: #ff66cc; color: var(--bg-color); }
+
+        .popular-card {
+            border: 1px solid #444; padding: 10px; margin-bottom: 10px;
+            background: rgba(255, 102, 204, 0.04); animation: fadeIn 0.3s ease-out;
+        }
+        .popular-card .pop-rank {
+            font-size: 18px; margin-right: 6px;
+        }
+        .popular-card .pop-header {
+            display: flex; align-items: center; justify-content: space-between;
+            font-size: 11px; color: #888; margin-bottom: 6px;
+        }
+        .popular-card .pop-challenge {
+            font-size: 13px; color: var(--text-main); margin: 6px 0;
+            line-height: 1.4;
+        }
+        .popular-card .pop-meta {
+            font-size: 11px; color: #888; margin-top: 6px;
+            display: flex; gap: 12px; flex-wrap: wrap;
+        }
+        .popular-card .pop-meta strong { color: var(--text-accent); }
+        .popular-card .pop-custom-badge {
+            display: inline-block; padding: 1px 6px; font-size: 10px;
+            border: 1px solid #ffd700; color: #ffd700; margin-left: 4px;
+        }
+        .popular-card .pop-submissions {
+            margin-top: 8px; padding-top: 8px; border-top: 1px dashed #333;
+        }
+        .popular-card .pop-sub-row {
+            display: flex; justify-content: space-between; align-items: center;
+            font-size: 11px; padding: 3px 0; gap: 8px;
+        }
+        .popular-card .pop-sub-row a {
+            color: var(--timer-color); text-decoration: none;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+            max-width: 140px;
+        }
+        .popular-card .pop-sub-row a:hover { text-decoration: underline; }
+
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes popIn {
@@ -179,6 +227,32 @@
 
             <button class="btn" id="btn-view-global-leaderboard" style="border-color: var(--timer-color); color: var(--timer-color);">View Global Leaderboard</button>
 
+            <div class="card" id="popular-feed-card" style="border-color: #ff66cc;">
+                <h3 style="margin-top:0; font-size:14px; color:#ff66cc;">> 🔥 MOST POPULAR</h3>
+                <p style="font-size: 11px; color: #888; margin: 0 0 10px;">Public-vote rounds from across DareDrop. Top 3 per filter.</p>
+
+                <div style="margin-bottom: 8px;">
+                    <p style="font-size: 11px; color: #888; margin: 0 0 4px;">When:</p>
+                    <div id="popular-time-chips" class="chip-row">
+                        <button class="filter-chip" data-time="day">Daily</button>
+                        <button class="filter-chip active" data-time="week">Weekly</button>
+                        <button class="filter-chip" data-time="month">Monthly</button>
+                        <button class="filter-chip" data-time="all">All-Time</button>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 12px;">
+                    <p style="font-size: 11px; color: #888; margin: 0 0 4px;">Category:</p>
+                    <div id="popular-category-chips" class="chip-row">
+                        <!-- Populated dynamically from challenges.json so adding a category to JSON adds a chip here. -->
+                    </div>
+                </div>
+
+                <div id="popular-feed-list">
+                    <p style="text-align: center; color: #888; font-size: 12px; padding: 20px 0;">Loading...</p>
+                </div>
+            </div>
+
             <div class="card">
                 <h3 style="margin-top:0; font-size:14px;">> MY GROUPS</h3>
                 <div id="group-list-container"></div>
@@ -232,7 +306,7 @@
                     <input type="checkbox" id="public-voting-checkbox" style="width: 18px; height: 18px;">
                     Enable Public Voting
                 </label>
-                <p style="font-size: 11px; color: #888; margin: 5px 0 0 28px;">Anyone with the public link can vote anonymously. Round won't end early - waits for full timer.</p>
+                <p style="font-size: 11px; color: #888; margin: 5px 0 0 28px;">Anyone with the public link can vote anonymously. Round won't end early - waits for full timer. Resolved rounds are featured in the global Most Popular feed.</p>
                 <p id="admin-save-status" style="font-size: 11px; color: var(--text-main); margin: 12px 0 0; text-align: right; min-height: 14px; opacity: 0; transition: opacity 0.2s;">✓ Saved</p>
                 </fieldset>
             </div>
@@ -552,6 +626,10 @@
 
             // Kick off global stats in parallel - don't block group rendering on it.
             loadGlobalStats();
+
+            // Popular feed: render filter chips (cheap, sync) and load data in parallel.
+            // Wrapped in setupPopularFeed to keep all state local to that closure.
+            setupPopularFeed();
 
             const container = document.getElementById('group-list-container');
             
@@ -1124,8 +1202,64 @@
                 challengeStatus: 'resolved',
                 members: survivingMembers
             });
-            
+
+            // INDEX FOR POPULAR FEED — only if the round was set to public voting.
+            // Deterministic doc ID makes this idempotent: if multiple clients race the
+            // resolve (timer expiry on N devices simultaneously), only one document ends
+            // up in popularChallenges per round.
+            if (data.publicVotingEnabled) {
+                indexResolvedRoundForPopularFeed(data).catch(err => {
+                    console.error("[popular feed index] failed but resolve already succeeded:", err);
+                });
+            }
+
             refreshGroupData();
+        }
+
+        // Snapshots a resolved round into the global popularChallenges collection.
+        // Snapshots category name/emoji at write time so deleting a category from
+        // challenges.json later doesn't break old cards.
+        async function indexResolvedRoundForPopularFeed(groupData) {
+            const submissionsObj = groupData.submissions || {};
+            const leaderboard = groupData.leaderboard || {};
+
+            // Flatten submissions into a sorted array. Only people who actually submitted
+            // get a card slot — non-participants aren't relevant to the popular feed.
+            const submissionsArr = Object.keys(submissionsObj).map(username => {
+                const sub = submissionsObj[username];
+                const votes = sub.votes || {};
+                const voteCount = Object.keys(votes).length;
+                const xp = leaderboard[username] || 0;
+                return {
+                    username,
+                    link: sub.link || "",
+                    voteCount,
+                    xp
+                };
+            }).sort((a, b) => b.xp - a.xp); // Top scorer first.
+
+            const totalXP = submissionsArr.reduce((s, x) => s + x.xp, 0);
+            const totalVotes = submissionsArr.reduce((s, x) => s + x.voteCount, 0);
+            const cat = getCategoryById(groupData.currentCategoryId);
+
+            // Deterministic ID — re-running resolve overwrites instead of duplicating.
+            const indexId = `${currentGroupId}_${groupData.challengeStartTime || Date.now()}`;
+
+            await setDoc(doc(db, "popularChallenges", indexId), {
+                groupId: currentGroupId,
+                groupName: groupData.groupName || "Unnamed",
+                challengeText: groupData.currentChallenge || "",
+                categoryId: cat.id,
+                categoryName: cat.name,
+                categoryEmoji: cat.emoji || "🎲",
+                isCustom: !!groupData.currentChallengeIsCustom,
+                customAuthor: groupData.currentChallengeAuthor || null,
+                submissions: submissionsArr,
+                totalXP,
+                totalVotes,
+                participantCount: submissionsArr.length,
+                completedAt: Date.now()
+            });
         }
 
         function startCountdown() {
@@ -1259,7 +1393,9 @@
         // the premium custom challenge flow. Archives the old challenge into history
         // (unless we were already pending), resets the leaderboard, clears submissions,
         // and snaps status back to 'pending' so the admin still has to press START.
-        async function startNewRoundWithChallenge(challengeText) {
+        // `meta.isCustom` and `meta.customAuthor` flow through to the popular feed index
+        // when the round resolves with public voting on, so users can see the ⭐ marker.
+        async function startNewRoundWithChallenge(challengeText, meta = {}) {
             let history = currentGroupData.challengeHistory || [];
             let hIndex = currentGroupData.historyIndex || 0;
 
@@ -1285,6 +1421,8 @@
                 historyIndex: hIndex,
                 leaderboard: newLeaderboard,
                 currentChallenge: challengeText,
+                currentChallengeIsCustom: !!meta.isCustom,
+                currentChallengeAuthor: meta.customAuthor || null,
                 challengeStartTime: null,
                 challengeStatus: 'pending',
                 submissions: {}
@@ -1335,7 +1473,7 @@
             btn.innerText = "Setting...";
             btn.disabled = true;
             try {
-                await startNewRoundWithChallenge(text);
+                await startNewRoundWithChallenge(text, { isCustom: true, customAuthor: currentUserName });
                 textarea.value = "";
                 refreshGroupData();
             } catch (e) {
@@ -1673,6 +1811,170 @@
                     }, 2000);
                 }
             }, 1000);
+        }
+
+        // ============================================================
+        // MOST POPULAR FEED - global discovery on the My Groups screen.
+        // Indexes only public-voting rounds; deterministic doc IDs make
+        // the indexer idempotent (see indexResolvedRoundForPopularFeed).
+        // ============================================================
+        const popularFeedState = {
+            time: 'week',         // 'day' | 'week' | 'month' | 'all'
+            categoryId: 'all',    // 'all' or a category id from challenges.json
+            cache: null,          // last fetched batch (~ all-time top N), filtered client-side
+            cacheAt: 0
+        };
+        const POPULAR_CACHE_MS = 60 * 1000; // 1 minute — avoids re-fetching on every chip click.
+        const POPULAR_FETCH_LIMIT = 100;    // Pull this many recent entries; client-side sorts/filters.
+
+        function setupPopularFeed() {
+            // Render category chips fresh each time — picks up any JSON edits the user made.
+            const catChips = document.getElementById('popular-category-chips');
+            const cats = (challengeData && challengeData.categories) || [];
+            const chipsHtml = ['<button class="filter-chip active" data-cat="all">All</button>']
+                .concat(cats.map(c => `<button class="filter-chip" data-cat="${c.id}">${c.emoji || '🎲'} ${c.name}</button>`))
+                .join('');
+            catChips.innerHTML = chipsHtml;
+
+            // Reset filter state to defaults each time we land on the screen.
+            popularFeedState.time = 'week';
+            popularFeedState.categoryId = 'all';
+            document.querySelectorAll('#popular-time-chips .filter-chip').forEach(b => {
+                b.classList.toggle('active', b.dataset.time === 'week');
+            });
+
+            // Wire chip clicks (idempotent — replace handlers each render to avoid stacking).
+            document.getElementById('popular-time-chips').onclick = (e) => {
+                const btn = e.target.closest('.filter-chip');
+                if (!btn) return;
+                popularFeedState.time = btn.dataset.time;
+                document.querySelectorAll('#popular-time-chips .filter-chip').forEach(b => b.classList.toggle('active', b === btn));
+                renderPopularFeed();
+            };
+            document.getElementById('popular-category-chips').onclick = (e) => {
+                const btn = e.target.closest('.filter-chip');
+                if (!btn) return;
+                popularFeedState.categoryId = btn.dataset.cat;
+                document.querySelectorAll('#popular-category-chips .filter-chip').forEach(b => b.classList.toggle('active', b === btn));
+                renderPopularFeed();
+            };
+
+            // Kick off the data fetch (cached) and render.
+            loadPopularFeedData().then(renderPopularFeed);
+        }
+
+        async function loadPopularFeedData() {
+            // Reuse cache if recent — chip clicks shouldn't refetch.
+            if (popularFeedState.cache && (Date.now() - popularFeedState.cacheAt) < POPULAR_CACHE_MS) {
+                return popularFeedState.cache;
+            }
+            try {
+                // Single query: most recent N entries. Time + category filtering is client-side
+                // so we can switch tabs instantly without round-tripping. 100 entries × small
+                // payload is well within sane Firestore read budgets.
+                const q = query(
+                    collection(db, "popularChallenges"),
+                    orderBy("completedAt", "desc"),
+                    limit(POPULAR_FETCH_LIMIT)
+                );
+                const snap = await getDocs(q);
+                const items = [];
+                snap.forEach(d => items.push(d.data()));
+                popularFeedState.cache = items;
+                popularFeedState.cacheAt = Date.now();
+                return items;
+            } catch (e) {
+                console.error("[popular feed] fetch failed:", e);
+                popularFeedState.cache = [];
+                return [];
+            }
+        }
+
+        function renderPopularFeed() {
+            const listEl = document.getElementById('popular-feed-list');
+            const items = popularFeedState.cache || [];
+            if (items.length === 0) {
+                listEl.innerHTML = "<p style='text-align:center; color:#888; font-size:12px; padding:20px 0;'>No public-vote rounds yet. Be the first — flip on Public Voting in your group settings.</p>";
+                return;
+            }
+
+            // Time window filter.
+            const now = Date.now();
+            const windowMs = {
+                day: 24 * 60 * 60 * 1000,
+                week: 7 * 24 * 60 * 60 * 1000,
+                month: 30 * 24 * 60 * 60 * 1000,
+                all: Infinity
+            }[popularFeedState.time];
+            const cutoff = popularFeedState.time === 'all' ? 0 : (now - windowMs);
+
+            // Category + time filter, then sort by total XP (popularity), take top 3.
+            const filtered = items
+                .filter(x => x.completedAt >= cutoff)
+                .filter(x => popularFeedState.categoryId === 'all' || x.categoryId === popularFeedState.categoryId)
+                .sort((a, b) => (b.totalXP || 0) - (a.totalXP || 0))
+                .slice(0, 3);
+
+            if (filtered.length === 0) {
+                listEl.innerHTML = "<p style='text-align:center; color:#888; font-size:12px; padding:20px 0;'>Nothing in this slice yet. Try a wider time range or another category.</p>";
+                return;
+            }
+
+            const medals = ['🥇', '🥈', '🥉'];
+            listEl.innerHTML = filtered.map((item, idx) => renderPopularCard(item, medals[idx])).join('');
+        }
+
+        function renderPopularCard(item, medal) {
+            const customBadge = item.isCustom
+                ? `<span class="pop-custom-badge">⭐ CUSTOM by ${escapeHtml(item.customAuthor || '?')}</span>`
+                : '';
+
+            const subsHtml = (item.submissions || []).map(s => {
+                const linkPart = s.link
+                    ? `<a href="${escapeHtml(s.link)}" target="_blank" rel="noopener noreferrer">${escapeHtml(s.link)}</a>`
+                    : '<span style="color:#555;">no link</span>';
+                return `
+                    <div class="pop-sub-row">
+                        <span><strong style="color:var(--text-accent);">${escapeHtml(s.username)}</strong> ${linkPart}</span>
+                        <span style="color:#888; white-space:nowrap;">${s.voteCount} 🗳 · ${s.xp} XP</span>
+                    </div>`;
+            }).join('');
+
+            return `
+                <div class="popular-card">
+                    <div class="pop-header">
+                        <span><span class="pop-rank">${medal}</span> ${escapeHtml(item.categoryEmoji || '🎲')} <strong>${escapeHtml(item.categoryName || 'Category')}</strong> · in <strong>${escapeHtml(item.groupName || 'group')}</strong>${customBadge}</span>
+                        <span>${formatRelativeTime(item.completedAt)}</span>
+                    </div>
+                    <div class="pop-challenge">"${escapeHtml(item.challengeText || '')}"</div>
+                    <div class="pop-meta">
+                        <span><strong>${item.totalXP || 0}</strong> XP</span>
+                        <span><strong>${item.totalVotes || 0}</strong> votes</span>
+                        <span><strong>${item.participantCount || 0}</strong> participants</span>
+                    </div>
+                    ${subsHtml ? `<div class="pop-submissions">${subsHtml}</div>` : ''}
+                </div>`;
+        }
+
+        function escapeHtml(s) {
+            return String(s).replace(/[&<>"']/g, c => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[c]));
+        }
+
+        function formatRelativeTime(ts) {
+            if (!ts) return '';
+            const diff = Date.now() - ts;
+            const sec = Math.floor(diff / 1000);
+            if (sec < 60) return 'just now';
+            const min = Math.floor(sec / 60);
+            if (min < 60) return `${min}m ago`;
+            const hr = Math.floor(min / 60);
+            if (hr < 24) return `${hr}h ago`;
+            const day = Math.floor(hr / 24);
+            if (day < 30) return `${day}d ago`;
+            const mo = Math.floor(day / 30);
+            return `${mo}mo ago`;
         }
 
         // ============================================================
