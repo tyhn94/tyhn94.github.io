@@ -150,16 +150,34 @@
         .popular-card .pop-submissions {
             margin-top: 8px; padding-top: 8px; border-top: 1px dashed #333;
         }
-        .popular-card .pop-sub-row {
+        .popular-card .pop-sub-block {
+            margin: 10px 0; padding-bottom: 10px; border-bottom: 1px dashed #222;
+        }
+        .popular-card .pop-sub-block:last-child { border-bottom: none; padding-bottom: 0; }
+        .popular-card .pop-sub-head {
             display: flex; justify-content: space-between; align-items: center;
-            font-size: 11px; padding: 3px 0; gap: 8px;
+            font-size: 11px; margin-bottom: 6px; gap: 8px;
         }
-        .popular-card .pop-sub-row a {
-            color: var(--timer-color); text-decoration: none;
-            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-            max-width: 140px;
+        .popular-card .pop-sub-embed {
+            width: 100%; background: #000; overflow: hidden; border: 1px solid #222;
         }
-        .popular-card .pop-sub-row a:hover { text-decoration: underline; }
+        /* Embed iframes — let each platform pick its own height since their aspect ratios differ.
+           Width always fills the container, max-width ensures we don't blow past the card on desktop. */
+        .embed-iframe {
+            display: block; width: 100%; max-width: 100%; border: none;
+            background: #0a0a0a;
+        }
+        .embed-instagram { min-height: 580px; }
+        .embed-youtube { aspect-ratio: 16 / 9; height: auto; }
+        .embed-tiktok { min-height: 740px; }
+        .embed-twitter { min-height: 380px; }
+        .embed-image { display: block; width: 100%; height: auto; max-height: 600px; object-fit: contain; }
+        .embed-video { display: block; width: 100%; max-height: 600px; background: #000; }
+        .embed-fallback-link {
+            display: block; padding: 10px; font-size: 11px; color: var(--timer-color);
+            text-decoration: none; word-break: break-all;
+        }
+        .embed-fallback-link:hover { text-decoration: underline; }
 
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
@@ -227,31 +245,7 @@
 
             <button class="btn" id="btn-view-global-leaderboard" style="border-color: var(--timer-color); color: var(--timer-color);">View Global Leaderboard</button>
 
-            <div class="card" id="popular-feed-card" style="border-color: #ff66cc;">
-                <h3 style="margin-top:0; font-size:14px; color:#ff66cc;">> 🔥 MOST POPULAR</h3>
-                <p style="font-size: 11px; color: #888; margin: 0 0 10px;">Public-vote rounds from across DareDrop. Top 3 per filter.</p>
-
-                <div style="margin-bottom: 8px;">
-                    <p style="font-size: 11px; color: #888; margin: 0 0 4px;">When:</p>
-                    <div id="popular-time-chips" class="chip-row">
-                        <button class="filter-chip" data-time="day">Daily</button>
-                        <button class="filter-chip active" data-time="week">Weekly</button>
-                        <button class="filter-chip" data-time="month">Monthly</button>
-                        <button class="filter-chip" data-time="all">All-Time</button>
-                    </div>
-                </div>
-
-                <div style="margin-bottom: 12px;">
-                    <p style="font-size: 11px; color: #888; margin: 0 0 4px;">Category:</p>
-                    <div id="popular-category-chips" class="chip-row">
-                        <!-- Populated dynamically from challenges.json so adding a category to JSON adds a chip here. -->
-                    </div>
-                </div>
-
-                <div id="popular-feed-list">
-                    <p style="text-align: center; color: #888; font-size: 12px; padding: 20px 0;">Loading...</p>
-                </div>
-            </div>
+            <button class="btn" id="btn-view-popular" style="border-color: #ff66cc; color: #ff66cc;">🔥 Most Popular Challenges</button>
 
             <div class="card">
                 <h3 style="margin-top:0; font-size:14px;">> MY GROUPS</h3>
@@ -265,6 +259,36 @@
             </div>
 
             <button class="btn" style="border-color: #555; color: #555; margin-top: 30px;" onclick="switchUser()">Switch User (Logout)</button>
+        </div>
+
+        <div id="screen-popular" class="screen">
+            <h1 class="title-glitch" style="font-size: 22px;">🔥 MOST POPULAR</h1>
+            <p style="font-size: 12px; color: #888; text-align: center; margin: 0 0 15px;">Public-vote challenges from across DareDrop. Top 3 per filter.</p>
+
+            <div class="card" style="border-color: #ff66cc;">
+                <div style="margin-bottom: 10px;">
+                    <p style="font-size: 11px; color: #888; margin: 0 0 5px;">When:</p>
+                    <div id="popular-time-chips" class="chip-row">
+                        <button class="filter-chip" data-time="day">Daily</button>
+                        <button class="filter-chip active" data-time="week">Weekly</button>
+                        <button class="filter-chip" data-time="month">Monthly</button>
+                        <button class="filter-chip" data-time="all">All-Time</button>
+                    </div>
+                </div>
+
+                <div>
+                    <p style="font-size: 11px; color: #888; margin: 0 0 5px;">Category:</p>
+                    <div id="popular-category-chips" class="chip-row">
+                        <!-- Populated dynamically from challenges.json so adding a category to JSON adds a chip here. -->
+                    </div>
+                </div>
+            </div>
+
+            <div id="popular-feed-list">
+                <p style="text-align: center; color: #888; font-size: 12px; padding: 20px 0;">Loading...</p>
+            </div>
+
+            <button class="btn" style="border-color: #555; color: #555; margin-top: 20px;" onclick="renderMyGroups()">< Back to My Groups</button>
         </div>
 
         <div id="screen-dashboard" class="screen">
@@ -626,10 +650,6 @@
 
             // Kick off global stats in parallel - don't block group rendering on it.
             loadGlobalStats();
-
-            // Popular feed: render filter chips (cheap, sync) and load data in parallel.
-            // Wrapped in setupPopularFeed to keep all state local to that closure.
-            setupPopularFeed();
 
             const container = document.getElementById('group-list-container');
             
@@ -1930,13 +1950,13 @@
                 : '';
 
             const subsHtml = (item.submissions || []).map(s => {
-                const linkPart = s.link
-                    ? `<a href="${escapeHtml(s.link)}" target="_blank" rel="noopener noreferrer">${escapeHtml(s.link)}</a>`
-                    : '<span style="color:#555;">no link</span>';
                 return `
-                    <div class="pop-sub-row">
-                        <span><strong style="color:var(--text-accent);">${escapeHtml(s.username)}</strong> ${linkPart}</span>
-                        <span style="color:#888; white-space:nowrap;">${s.voteCount} 🗳 · ${s.xp} XP</span>
+                    <div class="pop-sub-block">
+                        <div class="pop-sub-head">
+                            <strong style="color:var(--text-accent);">${escapeHtml(s.username)}</strong>
+                            <span style="color:#888; white-space:nowrap;">${s.voteCount} 🗳 · ${s.xp} XP</span>
+                        </div>
+                        <div class="pop-sub-embed">${renderEmbed(s.link)}</div>
                     </div>`;
             }).join('');
 
@@ -1954,6 +1974,79 @@
                     </div>
                     ${subsHtml ? `<div class="pop-submissions">${subsHtml}</div>` : ''}
                 </div>`;
+        }
+
+        // Render a submission link as a real embed when we recognize the host,
+        // otherwise fall back to a plain link. Iframes use loading="lazy" so a feed
+        // with 9 embedded posts (3 cards × ~3 subs) doesn't hammer the network on first paint.
+        // Keep this list focused on the platforms actual users post to — adding more later
+        // is a one-liner per platform.
+        function renderEmbed(url) {
+            if (!url) return '<span style="color:#555; font-size:11px;">— no link submitted —</span>';
+
+            let u;
+            try { u = new URL(url); } catch (e) { return embedLinkFallback(url); }
+            const host = u.hostname.replace(/^www\./, '');
+
+            // Instagram post / reel / IGTV — official /embed/ endpoint, no API key needed.
+            if (host === 'instagram.com' || host.endsWith('.instagram.com')) {
+                const m = u.pathname.match(/\/(p|reel|reels|tv)\/([^/?#]+)/);
+                if (m) {
+                    const kind = m[1] === 'reels' ? 'reel' : m[1];
+                    const embedUrl = `https://www.instagram.com/${kind}/${m[2]}/embed/`;
+                    return `<iframe src="${embedUrl}" class="embed-iframe embed-instagram" loading="lazy" frameborder="0" scrolling="no" allowtransparency="true" allowfullscreen></iframe>`;
+                }
+            }
+
+            // YouTube — both youtu.be short and youtube.com/watch?v=
+            if (host === 'youtube.com' || host.endsWith('.youtube.com') || host === 'youtu.be') {
+                let videoId = null;
+                if (host === 'youtu.be') {
+                    videoId = u.pathname.slice(1);
+                } else {
+                    videoId = u.searchParams.get('v');
+                    if (!videoId) {
+                        const m = u.pathname.match(/\/(?:embed|shorts)\/([^/?#]+)/);
+                        if (m) videoId = m[1];
+                    }
+                }
+                if (videoId) {
+                    return `<iframe src="https://www.youtube.com/embed/${encodeURIComponent(videoId)}" class="embed-iframe embed-youtube" loading="lazy" frameborder="0" allow="accelerometer; clipboard-write; encrypted-media; picture-in-picture" allowfullscreen></iframe>`;
+                }
+            }
+
+            // TikTok — official /embed/v2/[id]/
+            if (host === 'tiktok.com' || host.endsWith('.tiktok.com')) {
+                const m = u.pathname.match(/\/video\/(\d+)/);
+                if (m) {
+                    return `<iframe src="https://www.tiktok.com/embed/v2/${m[1]}" class="embed-iframe embed-tiktok" loading="lazy" frameborder="0" allow="encrypted-media" allowfullscreen scrolling="no"></iframe>`;
+                }
+            }
+
+            // Twitter / X — use twitframe.com which renders the official Twitter widget inside an iframe.
+            // (Twitter's own widget JS would require document.write or async script init — twitframe is simpler.)
+            if (host === 'twitter.com' || host === 'x.com' || host.endsWith('.twitter.com') || host.endsWith('.x.com')) {
+                if (/\/status\/\d+/.test(u.pathname)) {
+                    const embedUrl = `https://twitframe.com/show?url=${encodeURIComponent(url)}`;
+                    return `<iframe src="${embedUrl}" class="embed-iframe embed-twitter" loading="lazy" frameborder="0" scrolling="no"></iframe>`;
+                }
+            }
+
+            // Direct image URL — render as <img>.
+            if (/\.(jpg|jpeg|png|gif|webp|avif)(\?.*)?$/i.test(u.pathname)) {
+                return `<img src="${escapeHtml(url)}" class="embed-image" alt="submission" loading="lazy">`;
+            }
+
+            // Direct video URL — render as <video>.
+            if (/\.(mp4|webm|mov|m4v)(\?.*)?$/i.test(u.pathname)) {
+                return `<video src="${escapeHtml(url)}" class="embed-video" controls preload="metadata"></video>`;
+            }
+
+            return embedLinkFallback(url);
+        }
+
+        function embedLinkFallback(url) {
+            return `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="embed-fallback-link">${escapeHtml(url)}</a>`;
         }
 
         function escapeHtml(s) {
@@ -2095,6 +2188,17 @@
         document.getElementById('btn-view-global-leaderboard').addEventListener('click', () => {
             window.openGlobalLeaderboardOverlay();
         });
+
+        document.getElementById('btn-view-popular').addEventListener('click', () => {
+            openPopularScreen();
+        });
+
+        function openPopularScreen() {
+            showScreen('screen-popular');
+            // setupPopularFeed wires chip handlers, kicks off the data fetch, and renders.
+            // Cache (1 min TTL) means re-entering the screen is instant.
+            setupPopularFeed();
+        }
 
         // ============================================================
         // SOUND - tiny synthesized blip on button clicks. No assets.
