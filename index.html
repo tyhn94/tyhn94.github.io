@@ -1319,6 +1319,9 @@
                             <input type="text" inputmode="url" autocomplete="off" id="proof-link-input" placeholder="Paste your link here..." style="flex: 1; min-width: 0; margin: 0;">
                             <button type="button" class="btn" onclick="pasteFromClipboard()" title="Paste from clipboard" style="margin: 0; padding: 0 14px; width: 54px; flex: 0 0 54px; font-size: 18px;">📋</button>
                         </div>
+                        <button type="button" class="btn" onclick="previewProofLink()" style="margin: 0 0 8px; padding: 8px; font-size: 13px; border-color: var(--timer-color); color: var(--timer-color);">👁 Preview before submitting</button>
+                        <div id="proof-preview-slot" style="display:none;"></div>
+                        <p style="font-size: 11px; color: #888; margin: 0 0 10px; line-height: 1.4;">⚠️ If your account is private or the post is hidden, voters won't see your proof — and you won't earn XP. Make sure the post is public before submitting.</p>
                         <button class="btn btn-accent" onclick="submitProof()" style="margin-top: 0;">Submit Proof</button>
                     `;
 
@@ -1544,6 +1547,38 @@
                 // Permission denied or unsupported — just focus so the user can paste manually.
                 input.focus();
             }
+        };
+
+        // Renders the user's pasted link as an embed preview BEFORE they submit. Uses the same
+        // renderEmbed pipeline as the popular feed, so the user sees exactly what voters will see.
+        // If the post is from a private account, the embed will fail to load and our standard
+        // "Post unavailable" fallback layer will show through — that's the user's signal to
+        // either make the post public or pick a different one. Better catching it here than
+        // submitting blind and earning zero XP.
+        window.previewProofLink = function() {
+            const input = document.getElementById('proof-link-input');
+            const slot = document.getElementById('proof-preview-slot');
+            if (!input || !slot) return;
+            const url = input.value.trim();
+            if (!url) {
+                alert("Paste a link first, then preview it.");
+                return;
+            }
+            // Validate it's an embeddable platform link before bothering with the iframe.
+            const embedHtml = getEmbedHtml(url);
+            if (!embedHtml) {
+                slot.style.display = 'block';
+                slot.innerHTML = `<p style="font-size: 12px; color: var(--text-accent); padding: 10px; border: 1px dashed var(--text-accent); margin: 0 0 10px;">Geçersiz link. YouTube, TikTok veya Instagram linki olmalı.</p>`;
+                return;
+            }
+            // Use renderEmbed (the popular-feed renderer) instead of getEmbedHtml so we get the
+            // same fallback layer + .pop-sub-embed styling — what the voter sees, the submitter
+            // previews. Single source of truth for embed display.
+            slot.style.display = 'block';
+            slot.innerHTML = `
+                <p style="font-size: 11px; color: #888; margin: 0 0 6px; text-transform: uppercase; letter-spacing: 1px;">▾ Preview (what voters will see)</p>
+                <div class="pop-sub-embed" style="margin-bottom: 12px;">${renderEmbed(url)}</div>
+            `;
         };
 
         window.submitProof = async function() {
