@@ -151,6 +151,11 @@
             border: 1px solid #444; padding: 0; margin-bottom: 14px;
             background: rgba(255, 102, 204, 0.04); animation: fadeIn 0.3s ease-out;
             position: relative; /* establishes containing block for sticky children */
+            /* Approximate height of the card's top sticky bar. Used as the offset for the
+               submission sub-headers below, so they pin BELOW the card sticky instead of
+               on top of it. Expanded long challenges slightly exceed this, accepted trade-off
+               (expand state is rare and user-initiated). */
+            --pop-sticky-h: 76px;
         }
         /* Sticky context bar — pinned to the container's scroll top while the card is in view.
            Anchored to .container's overflow context (max-height: 95vh, overflow-y: auto).
@@ -213,9 +218,21 @@
             margin: 10px 0; padding-bottom: 10px; border-bottom: 1px dashed #222;
         }
         .popular-card .pop-sub-block:last-child { border-bottom: none; padding-bottom: 0; }
+        /* Stacked sticky: while scrolling through this submission's embed, its head pins
+           directly under the card's sticky bar. As the next submission scrolls into view,
+           ITS head replaces this one — so the user always sees:
+             [card sticky]   ← which challenge?
+             [sub head]      ← which submission within it?
+             [embed content scrolling underneath]
+           z-index < card sticky's z-index so the card bar sits on top during overlap. */
         .popular-card .pop-sub-head {
+            position: sticky; top: var(--pop-sticky-h); z-index: 4;
             display: flex; justify-content: space-between; align-items: center;
-            font-size: 11px; margin-bottom: 6px; gap: 8px;
+            font-size: 11px; padding: 6px 0; gap: 8px;
+            background: #0a0a0a;
+            border-bottom: 1px solid #1a1a1a;
+            margin: 0 -10px 6px; /* break out of .pop-body's 10px padding so it spans full card width */
+            padding-left: 10px; padding-right: 10px;
         }
         .popular-card .pop-sub-rank {
             display: inline-flex; align-items: center; gap: 4px;
