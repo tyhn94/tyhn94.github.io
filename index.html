@@ -52,13 +52,20 @@
             display: block; width: 100%; background: transparent; color: var(--text-main);
             border: 1px solid var(--text-main); padding: 12px; margin: 10px 0;
             font-family: inherit; font-size: 16px; font-weight: bold; cursor: pointer;
-            text-transform: uppercase; transition: all 0.2s;
+            text-transform: uppercase; transition: background 0.15s, color 0.15s, opacity 0.15s;
         }
-        .btn:hover:not(:disabled) { background: var(--text-main); color: var(--bg-color); }
         .btn-accent { border-color: var(--text-accent); color: var(--text-accent); }
-        .btn-accent:hover:not(:disabled) { background: var(--text-accent); color: var(--bg-color); }
         .btn-admin { border-color: var(--admin-color); color: var(--admin-color); }
-        .btn-admin:hover:not(:disabled) { background: var(--admin-color); color: var(--bg-color); }
+        /* Hover only on devices that actually have hover (mouse-driven). On touch the
+           :hover state sticks after a tap until you tap elsewhere — that's why the
+           Next Drop button stayed lit and unreadable after clicking. */
+        @media (hover: hover) {
+            .btn:hover:not(:disabled) { background: var(--text-main); color: var(--bg-color); }
+            .btn-accent:hover:not(:disabled) { background: var(--text-accent); color: var(--bg-color); }
+            .btn-admin:hover:not(:disabled) { background: var(--admin-color); color: var(--bg-color); }
+        }
+        /* Active (finger-down) feedback works on all devices — fires only while pressed. */
+        .btn:active:not(:disabled) { opacity: 0.6; }
         .btn:disabled { border-color: #555 !important; color: #555 !important; cursor: not-allowed; background: transparent !important; }
         input:disabled, input[type="checkbox"]:disabled {
             opacity: 0.4; cursor: not-allowed;
@@ -278,10 +285,27 @@
             display: flex; align-items: center; gap: 8px;
             margin-bottom: 8px; font-size: 12px;
         }
-        #discover-card #btn-discover-next:hover { background: #00ffaa; color: var(--bg-color); }
-        .popular-card .pop-sub-embed {
+        @media (hover: hover) {
+            #discover-card #btn-discover-next:hover { background: #00ffaa; color: var(--bg-color); }
+        }
+        /* Discover roll-in animation: starts blurred-and-shifted, settles to crisp.
+           Uses transform + filter (both GPU-accelerated) so it stays 60fps on mobile.
+           The blur acts as a pseudo-pixelize — covers any embed network latency with
+           visual motion instead of a stark black void. */
+        @keyframes discoverRollIn {
+            0%   { filter: blur(18px) brightness(1.4) hue-rotate(40deg); transform: scale(1.06); opacity: 0; }
+            40%  { opacity: 1; }
+            100% { filter: blur(0) brightness(1) hue-rotate(0); transform: scale(1); opacity: 1; }
+        }
+        #discover-content.rolling { animation: discoverRollIn 480ms ease-out; }
+        /* Hint to the browser to pre-allocate compositor layers — avoids first-frame jank. */
+        #discover-content { will-change: filter, transform; }
+        /* .pop-sub-embed is reused across Most Popular cards AND the Discover card,
+           so the rule needs to be top-level (not scoped to .popular-card) — otherwise
+           the fallback layer's position:absolute escapes its intended container and
+           leaks onto neighbouring elements. */
+        .pop-sub-embed {
             width: 100%; background: #000; overflow: hidden; border: 1px solid #222;
-            /* Becomes the positioning context for the fallback layer that sits behind the iframe. */
             position: relative; min-height: 120px;
         }
         /* Backdrop layer behind every embed iframe. While the iframe loads OR if the post
@@ -2392,6 +2416,16 @@
             const item = discoverState.pool.pop();
             discoverState.seenIds.add(item._id);
             contentEl.innerHTML = renderDiscoverCard(item);
+
+            // Trigger the roll-in animation. We toggle the class off/on across an animation
+            // frame so re-triggering on consecutive Next Drop taps actually replays — just
+            // re-adding the class on an already-classed element does nothing in CSS.
+            contentEl.classList.remove('rolling');
+            // Force a reflow so the browser registers the class removal before re-adding.
+            void contentEl.offsetWidth;
+            contentEl.classList.add('rolling');
+
+            playDiceRoll();
         }
 
         function renderDiscoverCard(item) {
@@ -2973,6 +3007,70 @@
                 oscBody.start(now); oscBody.stop(now + 0.05);
                 oscClick.start(now); oscClick.stop(now + 0.02);
                 
+            } catch (e) {}
+        }
+
+        // Generative dice-roll: 3 quick filtered-noise bursts at slightly random
+        // intervals, each with its own pitched body — mimics the "ticka-tacka-thud"
+        // of physical dice. ~350ms total, lines up with the discoverRollIn animation.
+        // Audio is fully synthesized; no asset loads.
+        function playDiceRoll() {
+            if (!soundEnabled) return;
+            try {
+                if (!audioContext) {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (audioContext.state === 'suspended') audioContext.resume();
+
+                const startNow = audioContext.currentTime;
+                // 3 ticks — last one slightly louder to feel like a "settle".
+                const ticks = [
+                    { offset: 0.00, pitch: 1800, dur: 0.035, gain: 0.18 },
+                    { offset: 0.09, pitch: 2200, dur: 0.030, gain: 0.16 },
+                    { offset: 0.21, pitch: 1500, dur: 0.060, gain: 0.24 }
+                ];
+
+                ticks.forEach(t => {
+                    const at = startNow + t.offset + (Math.random() - 0.5) * 0.02; // jitter
+
+                    // Noise burst — short white-noise buffer through a band-pass filter.
+                    const bufSize = Math.floor(audioContext.sampleRate * t.dur);
+                    const buf = audioContext.createBuffer(1, bufSize, audioContext.sampleRate);
+                    const ch = buf.getChannelData(0);
+                    for (let i = 0; i < bufSize; i++) ch[i] = Math.random() * 2 - 1;
+                    const noise = audioContext.createBufferSource();
+                    noise.buffer = buf;
+
+                    const bp = audioContext.createBiquadFilter();
+                    bp.type = 'bandpass';
+                    bp.frequency.value = t.pitch;
+                    bp.Q.value = 6;
+
+                    const g = audioContext.createGain();
+                    g.gain.setValueAtTime(0, at);
+                    g.gain.linearRampToValueAtTime(t.gain, at + 0.003);
+                    g.gain.exponentialRampToValueAtTime(0.0001, at + t.dur);
+
+                    noise.connect(bp);
+                    bp.connect(g);
+                    g.connect(audioContext.destination);
+                    noise.start(at);
+                    noise.stop(at + t.dur);
+
+                    // Subtle low-end "thud" body for each tick — gives weight.
+                    const osc = audioContext.createOscillator();
+                    const og = audioContext.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(180 + Math.random() * 40, at);
+                    osc.frequency.exponentialRampToValueAtTime(60, at + t.dur);
+                    og.gain.setValueAtTime(0, at);
+                    og.gain.linearRampToValueAtTime(t.gain * 0.6, at + 0.002);
+                    og.gain.exponentialRampToValueAtTime(0.0001, at + t.dur);
+                    osc.connect(og);
+                    og.connect(audioContext.destination);
+                    osc.start(at);
+                    osc.stop(at + t.dur);
+                });
             } catch (e) {}
         }
 
