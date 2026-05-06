@@ -59,7 +59,7 @@
             opacity: 0.4; cursor: not-allowed; pointer-events: none;
         }
         
-        input[type="text"], input[type="number"] {
+        input[type="text"], input[type="number"], input[type="url"], input[type="email"] {
             width: 100%; padding: 10px; background: #000; border: 1px solid var(--text-main);
             color: var(--text-main); font-family: inherit; margin-bottom: 15px; outline: none;
         }
@@ -977,9 +977,9 @@
 
                 if (!hasSubmitted) {
                     interactionDiv.innerHTML = `
-                        <div style="display: flex; gap: 5px; margin-bottom: 8px;">
-                            <input type="url" inputmode="url" autocomplete="off" id="proof-link-input" placeholder="Paste your link here..." style="flex: 1; margin: 0;">
-                            <button type="button" class="btn" onclick="pasteFromClipboard()" title="Paste from clipboard" style="margin: 0; padding: 8px 12px; min-width: 50px; flex-shrink: 0;">📋</button>
+                        <div style="display: flex; gap: 6px; align-items: stretch; margin-bottom: 8px;">
+                            <input type="text" inputmode="url" autocomplete="off" id="proof-link-input" placeholder="Paste your link here..." style="flex: 1; min-width: 0; margin: 0;">
+                            <button type="button" class="btn" onclick="pasteFromClipboard()" title="Paste from clipboard" style="margin: 0; padding: 0 14px; width: 54px; flex: 0 0 54px; font-size: 18px;">📋</button>
                         </div>
                         <button class="btn btn-accent" onclick="submitProof()" style="margin-top: 0;">Submit Proof</button>
                     `;
