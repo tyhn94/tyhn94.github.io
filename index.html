@@ -481,6 +481,25 @@
         .urgent-banner.celebrate .urgent-banner-icon {
             animation: celebrateIconPop 0.6s ease-out;
         }
+        /* Admin-tone variant — same urgency pattern, but in admin-orange to signal
+           "you're being nudged, not threatened." Admins can't be kicked, so the alarm-red
+           treatment would over-promise consequences they don't actually face. */
+        .urgent-banner.admin-tone {
+            background: linear-gradient(180deg, #2a1a00 0%, #1a1000 100%);
+            border-top-color: var(--admin-color);
+            border-bottom-color: var(--admin-color);
+            box-shadow: 0 4px 12px rgba(255, 165, 0, 0.3);
+            animation: adminPulse 1.8s ease-in-out infinite;
+        }
+        .urgent-banner.admin-tone .urgent-banner-line {
+            color: var(--admin-color);
+            text-shadow: 0 0 8px rgba(255, 165, 0, 0.55);
+        }
+        .urgent-banner.admin-tone .urgent-banner-sub { color: #aa8855; }
+        @keyframes adminPulse {
+            0%, 100% { box-shadow: 0 4px 12px rgba(255, 165, 0, 0.3); }
+            50%      { box-shadow: 0 4px 22px rgba(255, 165, 0, 0.6); }
+        }
         @keyframes celebrateFade {
             0%   { opacity: 0; transform: translateY(-6px); }
             10%  { opacity: 1; transform: translateY(0); }
@@ -1279,16 +1298,14 @@
             // SKIPPED when public voting is enabled - round must wait for full timer
             // so external voters get the entire window to weigh in.
             //
-            // ADMIN EXEMPTION: the admin is protected from kicks (see resolveChallengeAndKick),
-            // so requiring their participation here would deadlock the round whenever the admin
-            // sits out. Skip the admin in the completeness check — non-admins finishing among
-            // themselves is enough to trigger early resolution.
+            // ADMIN INCLUSION: the admin IS counted in the completeness check — the round
+            // shouldn't end early just because non-admins finished. The admin is a player
+            // too and their submission/vote contributes to the leaderboard. They're still
+            // protected from kicks at resolve time (see resolveChallengeAndKick); that's a
+            // separate concern. If the admin sits out and the timer hits zero, the round
+            // resolves on schedule without kicking them — fairness preserved on both ends.
             if (status === 'active' && currentGroupData.members.length > 0 && !currentGroupData.publicVotingEnabled) {
-                const adminName = currentGroupData.adminName;
-                const playingMembers = currentGroupData.members.filter(m => m !== adminName);
-                // Need at least one non-admin player; otherwise (admin alone, or admin + nobody)
-                // there's nothing to early-resolve.
-                const allComplete = playingMembers.length > 0 && playingMembers.every(member => {
+                const allComplete = currentGroupData.members.every(member => {
                     if (!submissions[member]) return false;
                     const others = Object.keys(submissions).filter(m => m !== member);
                     if (others.length === 0) return true; // no one else submitted yet
@@ -1399,12 +1416,24 @@
                 hideUrgentBanner();
             } else {
                 // Admin gets a different framing: they're protected from kicks (so the
-                // "or you'll get kicked!" stick doesn't apply), but the carrot of XP still
-                // motivates them to play. Non-admins see the original survive-or-die framing.
+                // "or you'll get kicked!" stick doesn't apply), but the round won't end
+                // early until the admin also submits + votes. Show a softer "admin-toned"
+                // banner instead of the red kick-warning so it's clear they're nudged,
+                // not threatened.
                 if (isAdmin) {
-                    statusEl.innerText = "👑 ADMIN: Play to earn XP (you can't be kicked).";
-                    statusEl.style.color = "var(--admin-color)";
-                    hideUrgentBanner();
+                    if (isSafe) {
+                        statusEl.innerText = "👑 ADMIN: All set — XP locked in.";
+                        statusEl.style.color = "var(--admin-color)";
+                        hideUrgentBanner();
+                    } else if (!hasSubmitted) {
+                        statusEl.innerText = "👑 ADMIN: Submit your link to earn XP.";
+                        statusEl.style.color = "var(--admin-color)";
+                        showUrgentBanner('SUBMIT YOUR LINK', "Round won't end early until you play too.", 'admin');
+                    } else {
+                        statusEl.innerText = "👑 ADMIN: Vote on the others to earn XP.";
+                        statusEl.style.color = "var(--admin-color)";
+                        showUrgentBanner('VOTE ON THE OTHERS', "Round won't end early until you play too.", 'admin');
+                    }
                 } else if (isSafe) {
                     statusEl.innerText = "✅ YOU'RE ALL SET — kick-proof.";
                     statusEl.style.color = "var(--text-main)";
@@ -1694,12 +1723,16 @@
         // the user transitions from "needs to act" → "safe" — without false-positive
         // celebrations on every refresh of an already-safe user.
         let _urgentBannerWasVisible = false;
-        function showUrgentBanner(text, sub) {
+        function showUrgentBanner(text, sub, variant) {
             const banner = document.getElementById('urgent-action-banner');
             const textEl = document.getElementById('urgent-banner-text');
             const subEl = document.getElementById('urgent-banner-sub');
             if (!banner || !textEl) return;
-            banner.classList.remove('celebrate'); // back to alert mode if we were celebrating
+            banner.classList.remove('celebrate', 'admin-tone');
+            // 'admin' variant uses the orange admin color & a softer message tone.
+            // The admin can't be kicked, so the alarm-red treatment would over-promise
+            // consequences. They're being nudged, not threatened.
+            if (variant === 'admin') banner.classList.add('admin-tone');
             textEl.innerText = text;
             if (subEl && sub) subEl.innerText = sub;
             banner.style.display = 'block';
@@ -1716,10 +1749,11 @@
                 const textEl = document.getElementById('urgent-banner-text');
                 const subEl = document.getElementById('urgent-banner-sub');
                 const iconEl = banner.querySelector('.urgent-banner-icon');
+                banner.classList.remove('admin-tone'); // celebrate is always green, regardless of prior tone
                 banner.classList.add('celebrate');
                 if (iconEl) iconEl.innerText = '✓';
                 if (textEl) textEl.innerText = "YOU'RE ALL SET";
-                if (subEl) subEl.innerText = "Kick-proof. Sit back and watch the others.";
+                if (subEl) subEl.innerText = "XP locked in. Sit back and watch.";
                 banner.style.display = 'block';
                 clearTimeout(banner._celebrateTimer);
                 banner._celebrateTimer = setTimeout(() => {
@@ -1731,7 +1765,7 @@
             } else {
                 // No celebration needed — wasn't visible, just keep it hidden.
                 banner.style.display = 'none';
-                banner.classList.remove('celebrate');
+                banner.classList.remove('celebrate', 'admin-tone');
             }
         }
         // Tapping the banner scrolls to the Challenge card so the user is dropped right
