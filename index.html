@@ -463,6 +463,35 @@
         @media (prefers-reduced-motion: reduce) {
             .urgent-banner, .urgent-banner-icon { animation: none; }
         }
+        /* Celebrate state — flips colour from red-alert to green-success when the user
+           completes their required action (submit + at least one vote). 2.4-second
+           hold before the banner hides itself. Glow-in-then-fade for satisfying close. */
+        .urgent-banner.celebrate {
+            background: linear-gradient(180deg, #002a14 0%, #001a0d 100%);
+            border-top-color: var(--text-main);
+            border-bottom-color: var(--text-main);
+            box-shadow: 0 4px 18px rgba(51, 255, 0, 0.45);
+            animation: celebrateFade 2.4s ease-out forwards;
+        }
+        .urgent-banner.celebrate .urgent-banner-line {
+            color: var(--text-main);
+            text-shadow: 0 0 10px rgba(51, 255, 0, 0.7);
+        }
+        .urgent-banner.celebrate .urgent-banner-sub { color: #66aa77; }
+        .urgent-banner.celebrate .urgent-banner-icon {
+            animation: celebrateIconPop 0.6s ease-out;
+        }
+        @keyframes celebrateFade {
+            0%   { opacity: 0; transform: translateY(-6px); }
+            10%  { opacity: 1; transform: translateY(0); }
+            70%  { opacity: 1; }
+            100% { opacity: 0; transform: translateY(-6px); }
+        }
+        @keyframes celebrateIconPop {
+            0%   { transform: scale(0) rotate(-180deg); }
+            60%  { transform: scale(1.4) rotate(20deg); }
+            100% { transform: scale(1) rotate(0deg); }
+        }
     </style>
 </head>
 <body>
@@ -1377,7 +1406,7 @@
                     statusEl.style.color = "var(--admin-color)";
                     hideUrgentBanner();
                 } else if (isSafe) {
-                    statusEl.innerText = "✅ YOU ARE SAFE FROM THE KICK.";
+                    statusEl.innerText = "✅ YOU'RE ALL SET — kick-proof.";
                     statusEl.style.color = "var(--text-main)";
                     hideUrgentBanner();
                 } else if (!hasSubmitted) {
@@ -1661,18 +1690,49 @@
         // === URGENT ACTION BANNER HELPERS ===
         // Show/hide the sticky red banner at the top of the dashboard. Called from
         // refreshGroupData based on the user's status (must submit, must vote, etc.).
+        // Tracks last visible state so we can play a "you're all set" celebration when
+        // the user transitions from "needs to act" → "safe" — without false-positive
+        // celebrations on every refresh of an already-safe user.
+        let _urgentBannerWasVisible = false;
         function showUrgentBanner(text, sub) {
             const banner = document.getElementById('urgent-action-banner');
             const textEl = document.getElementById('urgent-banner-text');
             const subEl = document.getElementById('urgent-banner-sub');
             if (!banner || !textEl) return;
+            banner.classList.remove('celebrate'); // back to alert mode if we were celebrating
             textEl.innerText = text;
             if (subEl && sub) subEl.innerText = sub;
             banner.style.display = 'block';
+            _urgentBannerWasVisible = true;
         }
         function hideUrgentBanner() {
             const banner = document.getElementById('urgent-action-banner');
-            if (banner) banner.style.display = 'none';
+            if (!banner) return;
+            // If the banner was visible (user just completed their action) → flip to a
+            // green "you're all set" state for 2 seconds before hiding. Pure positive
+            // reinforcement, the moment that makes the action feel "completed."
+            if (_urgentBannerWasVisible) {
+                _urgentBannerWasVisible = false;
+                const textEl = document.getElementById('urgent-banner-text');
+                const subEl = document.getElementById('urgent-banner-sub');
+                const iconEl = banner.querySelector('.urgent-banner-icon');
+                banner.classList.add('celebrate');
+                if (iconEl) iconEl.innerText = '✓';
+                if (textEl) textEl.innerText = "YOU'RE ALL SET";
+                if (subEl) subEl.innerText = "Kick-proof. Sit back and watch the others.";
+                banner.style.display = 'block';
+                clearTimeout(banner._celebrateTimer);
+                banner._celebrateTimer = setTimeout(() => {
+                    banner.style.display = 'none';
+                    banner.classList.remove('celebrate');
+                    if (iconEl) iconEl.innerText = '⚠️'; // reset for next alert
+                }, 2400);
+                playSuccessChime();
+            } else {
+                // No celebration needed — wasn't visible, just keep it hidden.
+                banner.style.display = 'none';
+                banner.classList.remove('celebrate');
+            }
         }
         // Tapping the banner scrolls to the Challenge card so the user is dropped right
         // at the input/voting area. Smooth scroll inside .container's overflow context.
@@ -3396,6 +3456,39 @@
                 <script>
     (function() {
         let fireworksFired = false;
+
+        // Light "task completed" chime — two-note rising ding played when the urgent
+        // banner flips to its green YOU'RE ALL SET state. Quieter and shorter than the
+        // round-end victory chime, since it triggers every round (don't want fanfare).
+        function playSuccessChime() {
+            if (!soundEnabled) return;
+            try {
+                let ctx = audioContext || new (window.AudioContext || window.webkitAudioContext)();
+                if (!audioContext) audioContext = ctx;
+                if (ctx.state === 'suspended') ctx.resume();
+
+                const now = ctx.currentTime;
+                // E5 → A5 — perfect 4th rising. Universally read as "completed / OK".
+                const notes = [659.25, 880.00];
+
+                notes.forEach((freq, i) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sine'; // soft, not retro/square — gentle satisfaction
+                    osc.frequency.value = freq;
+
+                    const t = now + (i * 0.09);
+                    gain.gain.setValueAtTime(0, t);
+                    gain.gain.linearRampToValueAtTime(0.12, t + 0.015);
+                    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(t);
+                    osc.stop(t + 0.4);
+                });
+            } catch (e) {}
+        }
 
         function playVictoryChime() {
             const isMuted = localStorage.getItem("daredrop_sound") === "off";
