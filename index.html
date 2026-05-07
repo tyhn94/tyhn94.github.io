@@ -102,6 +102,71 @@
         .group-list-btn { flex: 1; text-align: left; padding-left: 20px; margin: 0 !important; }
         .group-delete-btn { background: transparent; border: 1px solid #ff0000; color: #ff0000; cursor: pointer; font-family: inherit; font-size: 16px; padding: 0 15px; font-weight: bold; transition: all 0.2s; }
         .group-delete-btn:hover { background: #ff0000; color: var(--bg-color); }
+
+        /* Group list item — LIVE state. A round is currently active in this group, so the
+           user probably wants to jump in. Subtle pink glow + animated dot pulls the eye
+           without screaming. The glow-pulse echoes the urgent banner's pulse so the visual
+           language is consistent across the app: pink + pulsing = "your attention is wanted." */
+        .group-list-btn-live {
+            border-color: var(--text-accent) !important;
+            color: var(--text-accent) !important;
+            box-shadow: 0 0 12px rgba(255, 0, 102, 0.25);
+            animation: groupLivePulse 2.2s ease-in-out infinite;
+        }
+        @media (hover: hover) {
+            .group-list-btn-live:hover:not(:disabled) {
+                background: var(--text-accent) !important;
+                color: var(--bg-color) !important;
+            }
+        }
+        @keyframes groupLivePulse {
+            0%, 100% { box-shadow: 0 0 12px rgba(255, 0, 102, 0.25); }
+            50%      { box-shadow: 0 0 20px rgba(255, 0, 102, 0.55); }
+        }
+        .group-live-badge {
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 2px 7px; margin-right: 8px;
+            background: var(--text-accent); color: var(--bg-color);
+            font-size: 9px; font-weight: bold; letter-spacing: 1px;
+            vertical-align: middle;
+        }
+        .group-live-dot {
+            width: 6px; height: 6px; border-radius: 50%;
+            background: var(--bg-color);
+            animation: groupLiveDotBlink 1.2s ease-in-out infinite;
+        }
+        @keyframes groupLiveDotBlink {
+            0%, 100% { opacity: 1; }
+            50%      { opacity: 0.3; }
+        }
+        .group-list-name {
+            display: inline-block; vertical-align: middle;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .group-list-btn-live, .group-live-dot { animation: none; }
+        }
+
+        /* Scrollable group list — kicks in once the user is in 5+ groups. Caps the height
+           so the home screen doesn't become a wall of group buttons; everything below
+           (Create New Group, Logout) stays reachable without endless scrolling. The inner
+           scroll uses overscroll-behavior: contain so swiping past the top/bottom doesn't
+           also scroll the outer container — feels self-contained on mobile. */
+        #group-list-container.scrollable {
+            max-height: 50vh;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            /* Subtle inner padding so the scrollbar/edge doesn't crowd the buttons. */
+            padding-right: 4px;
+            /* Visual hint that there's more content below: gradient mask fades the bottom edge.
+               Combined with the actual scrollbar this makes "scrollability" obvious. */
+            mask-image: linear-gradient(to bottom, black 0%, black calc(100% - 18px), transparent 100%);
+            -webkit-mask-image: linear-gradient(to bottom, black 0%, black calc(100% - 18px), transparent 100%);
+        }
+        /* Slimmer scrollbar inside the group list for a less intrusive look. */
+        #group-list-container.scrollable::-webkit-scrollbar { width: 6px; }
+        #group-list-container.scrollable::-webkit-scrollbar-track { background: transparent; }
+        #group-list-container.scrollable::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+        #group-list-container.scrollable::-webkit-scrollbar-thumb:hover { background: #555; }
         
         .timer-display { font-size: 20px; text-align: center; font-weight: bold; margin: 10px 0; color: var(--timer-color); letter-spacing: 2px;}
 
@@ -1319,56 +1384,81 @@
             const validGroups = [];
             let needsDbUpdate = false;
 
-            container.innerHTML = ""; 
-
-            for (let i = 0; i < userData.groups.length; i++) {
-                const groupInfo = userData.groups[i];
+            // First pass: fetch all group docs in parallel, validate membership, collect data.
+            // We'll sort/render in a second pass so live-challenge groups can bubble to the top.
+            const groupFetches = userData.groups.map(async (groupInfo) => {
                 const docSnap = await getDoc(doc(db, "groups", groupInfo.id));
+                if (!docSnap.exists()) return { groupInfo, missing: true };
+                const gData = docSnap.data();
+                const isStillMember = (gData.members || []).includes(currentUserName);
+                if (!isStillMember) return { groupInfo, kicked: true };
+                return { groupInfo, gData };
+            });
+            const results = await Promise.all(groupFetches);
 
-                if (!docSnap.exists()) {
-                    // Group was deleted by admin, flag for cleanup
+            // Filter out missing/kicked, flag DB cleanup if any.
+            const liveCards = [];
+            results.forEach(r => {
+                if (r.missing || r.kicked) {
                     needsDbUpdate = true;
-                } else {
-                    const gData = docSnap.data();
-                    const isStillMember = (gData.members || []).includes(currentUserName);
-
-                    // We were kicked (or otherwise removed) from this group. Drop it from
-                    // the local list so it doesn't show in My Groups. The Firestore sync
-                    // happens in the same batched update below (needsDbUpdate flag).
-                    // Re-joining is still possible — the admin's invite link runs through
-                    // joinExistingGroup, which re-adds previously-removed users.
-                    if (!isStillMember) {
-                        needsDbUpdate = true;
-                        continue;
-                    }
-
-                    validGroups.push(groupInfo);
-                    const isAdmin = gData.adminName === currentUserName;
-
-                    const row = document.createElement('div');
-                    row.className = "group-list-item";
-
-                    const btn = document.createElement('button');
-                    btn.className = "btn group-list-btn";
-                    btn.innerHTML = "> " + groupInfo.name + (isAdmin ? " <span style='color:var(--admin-color); font-size:10px; font-weight:bold;'>(ADMIN)</span>" : "");
-                    btn.onclick = () => openDashboard(groupInfo.id);
-                    row.appendChild(btn);
-
-                    // Add Delete button if Admin
-                    if (isAdmin) {
-                        const delBtn = document.createElement('button');
-                        delBtn.className = "group-delete-btn";
-                        delBtn.innerText = "X";
-                        delBtn.onclick = (e) => {
-                            e.stopPropagation(); 
-                            deleteGroupFromMenu(groupInfo.id);
-                        };
-                        row.appendChild(delBtn);
-                    }
-
-                    container.appendChild(row);
+                    return;
                 }
+                liveCards.push(r);
+                validGroups.push(r.groupInfo);
+            });
+
+            // Sort: groups with an ACTIVE round bubble to the top — those are where the user
+            // most likely wants to go. Within each tier we preserve the user's original
+            // membership order so things don't shuffle unpredictably each refresh.
+            const originalIndex = new Map(userData.groups.map((g, i) => [g.id, i]));
+            liveCards.sort((a, b) => {
+                const aActive = a.gData.challengeStatus === 'active' ? 0 : 1;
+                const bActive = b.gData.challengeStatus === 'active' ? 0 : 1;
+                if (aActive !== bActive) return aActive - bActive;
+                return (originalIndex.get(a.groupInfo.id) ?? 0) - (originalIndex.get(b.groupInfo.id) ?? 0);
+            });
+
+            container.innerHTML = "";
+
+            for (const r of liveCards) {
+                const { groupInfo, gData } = r;
+                const isAdmin = gData.adminName === currentUserName;
+                const isLive = gData.challengeStatus === 'active';
+
+                const row = document.createElement('div');
+                row.className = "group-list-item" + (isLive ? " group-list-item-live" : "");
+
+                const btn = document.createElement('button');
+                btn.className = "btn group-list-btn" + (isLive ? " group-list-btn-live" : "");
+                // Compose label: optional LIVE badge, name, optional ADMIN tag.
+                const liveBadge = isLive ? '<span class="group-live-badge"><span class="group-live-dot"></span>LIVE</span>' : '';
+                const adminTag = isAdmin ? "<span style='color:var(--admin-color); font-size:10px; font-weight:bold;'>(ADMIN)</span>" : "";
+                btn.innerHTML = `${liveBadge}<span class="group-list-name">> ${escapeHtml(groupInfo.name)}</span>${adminTag}`;
+                btn.onclick = () => openDashboard(groupInfo.id);
+                row.appendChild(btn);
+
+                // Add Delete button if Admin
+                if (isAdmin) {
+                    const delBtn = document.createElement('button');
+                    delBtn.className = "group-delete-btn";
+                    delBtn.innerText = "X";
+                    delBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        deleteGroupFromMenu(groupInfo.id);
+                    };
+                    row.appendChild(delBtn);
+                }
+
+                container.appendChild(row);
             }
+
+            // Past this point only the cleanup/scroll-class section remains.
+
+            // Add a scroll-enabling class once the list gets long enough that it would
+            // dominate the home screen. Below the threshold we let it grow naturally;
+            // above it, .scrollable bounds the height and reveals an internal scrollbar.
+            const SCROLL_AT = 4;
+            container.classList.toggle('scrollable', liveCards.length > SCROLL_AT);
 
             // If we found deleted groups, update the user profile in Firestore silently
             if (needsDbUpdate) {
@@ -1379,6 +1469,7 @@
                 });
                 if (validGroups.length === 0) {
                     container.innerHTML = "<p style='color:#888; font-size:12px;'>You are not a member of any group yet.</p>";
+                    container.classList.remove('scrollable');
                 }
             }
         }
