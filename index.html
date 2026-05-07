@@ -786,7 +786,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-        import { getFirestore, collection, doc, setDoc, getDoc, updateDoc, arrayUnion, deleteDoc, increment, query, orderBy, limit, getDocs, where, getCountFromServer } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+        import { getFirestore, collection, doc, setDoc, getDoc, updateDoc, arrayUnion, deleteDoc, increment, query, orderBy, limit, getDocs, where, getCountFromServer, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
         const firebaseConfig = {
@@ -1045,6 +1045,9 @@
 
         // REWRITTEN: Now checks database to apply admin tags and clean up deleted groups
         window.renderMyGroups = async function() {
+            // Leaving the dashboard — drop the real-time listener so we don't keep
+            // billable reads running against a group the user isn't viewing.
+            teardownGroupListener();
             showScreen('screen-my-groups');
             // User explicitly returned to the menu — clear the resume marker so a fresh refresh lands here.
             localStorage.removeItem("daredrop_last_group_id");
@@ -1257,26 +1260,104 @@
             }
         }
 
+        // Active Firestore real-time listener for the open group's document.
+        // We keep a single subscription at a time; opening another group (or leaving
+        // the dashboard) tears the previous one down via teardownGroupListener().
+        let _groupUnsubscribe = null;
+
+        function teardownGroupListener() {
+            if (_groupUnsubscribe) {
+                _groupUnsubscribe();
+                _groupUnsubscribe = null;
+            }
+        }
+
         async function openDashboard(groupId) {
+            // If we're switching groups, drop the old listener first to avoid
+            // stale callbacks firing against the new group's UI.
+            teardownGroupListener();
+
             currentGroupId = groupId;
             // Persist last visited group so a page refresh resumes here instead of bouncing to My Groups.
             localStorage.setItem("daredrop_last_group_id", groupId);
             document.getElementById('member-list-ui').innerHTML = "<li>Loading...</li>";
             showScreen('screen-dashboard');
-            
-            await refreshGroupData();
+
+            // Real-time subscription. Every server-side change to this group document
+            // (someone joins, submits, votes, gets kicked, the round starts, the timer
+            // expires, the admin reroll) triggers refreshGroupData with the new snapshot
+            // — no manual refreshes needed anywhere else in the codebase.
+            //
+            // The first snapshot fires immediately with the current state, so this
+            // doubles as the initial load. No separate getDoc() call required.
+            _groupUnsubscribe = onSnapshot(
+                doc(db, "groups", groupId),
+                (snap) => { refreshGroupData(snap); },
+                (err) => {
+                    console.error("[group listener]", err);
+                    // Surface a one-time alert; a permission revocation or network drop
+                    // shouldn't silently break the UI.
+                    alert("Lost connection to the group. Please refresh.");
+                }
+            );
         }
 
-        async function refreshGroupData() {
-            const docSnap = await getDoc(doc(db, "groups", currentGroupId));
-            
+        // Diff helper: are the structural fields of two snapshots equivalent?
+        // We use this to decide whether re-rendering interaction-section is necessary.
+        // A vote being cast (just adding a value to submissions[X].votes[Y]) is NOT
+        // structural — re-rendering would tear down healthy iframes for nothing.
+        // A new submission, kick, status change, or reroll IS structural.
+        function _isStructurallyEquivalent(a, b) {
+            if (!a || !b) return false;
+            if (a.challengeStatus !== b.challengeStatus) return false;
+            if (a.currentChallenge !== b.currentChallenge) return false;
+            if (a.challengeStartTime !== b.challengeStartTime) return false;
+            const aMembers = a.members || [];
+            const bMembers = b.members || [];
+            if (aMembers.length !== bMembers.length) return false;
+            for (let i = 0; i < aMembers.length; i++) if (aMembers[i] !== bMembers[i]) return false;
+            // Submissions keys (who has submitted) — NOT vote contents.
+            const aSubKeys = Object.keys(a.submissions || {}).sort();
+            const bSubKeys = Object.keys(b.submissions || {}).sort();
+            if (aSubKeys.length !== bSubKeys.length) return false;
+            for (let i = 0; i < aSubKeys.length; i++) if (aSubKeys[i] !== bSubKeys[i]) return false;
+            // Each submission's link can change too (rare but possible if we ever allow edits).
+            for (const k of aSubKeys) {
+                if ((a.submissions[k]?.link) !== (b.submissions[k]?.link)) return false;
+            }
+            return true;
+        }
+
+        // Cache the previous snapshot so the listener can decide between full and partial render.
+        let _lastSnapshotData = null;
+
+        // Now snapshot-driven instead of fetch-driven. Accepts the snapshot from the
+        // onSnapshot listener so we never re-read the document — Firestore already
+        // delivered fresh data. Keeps a getDoc() fallback path for the rare callers
+        // that need a one-shot read (none right now, but future-proof).
+        async function refreshGroupData(snap) {
+            const docSnap = snap || await getDoc(doc(db, "groups", currentGroupId));
+
             if(!docSnap.exists()) {
+                // Group was deleted while we were watching it.
+                teardownGroupListener();
+                _lastSnapshotData = null;
                 alert("This group has been deleted.");
                 window.renderMyGroups();
                 return;
             }
 
-            currentGroupData = docSnap.data();
+            const newData = docSnap.data();
+
+            // Decide render strategy. If the only thing that changed is votes / leaderboard XP
+            // (someone cast a vote), do NOT re-render interaction-section — that would reset
+            // every iframe in the voting UI mid-watch. Status, banner, leaderboard, member list
+            // still update normally. If anything structural changed (status, members, who has
+            // submitted, the challenge text), do a full render.
+            const skipInteractionRender = _isStructurallyEquivalent(_lastSnapshotData, newData);
+
+            currentGroupData = newData;
+            _lastSnapshotData = newData;
             
             const amIStillMember = currentGroupData.members.includes(currentUserName);
             if(!amIStillMember) {
@@ -1390,7 +1471,11 @@
             const isSafe = hasSubmitted && hasVoted;
             const statusEl = document.getElementById('survival-status');
             const interactionDiv = document.getElementById('interaction-section');
-            interactionDiv.innerHTML = "";
+            // Only wipe interaction-section if we're going to re-render it. Skipping the wipe
+            // when we'd just re-build the same thing keeps voting iframes alive across snapshots.
+            if (!skipInteractionRender) {
+                interactionDiv.innerHTML = "";
+            }
 
             if (status === 'pending') {
                 statusEl.innerText = "WAITING FOR ADMIN TO START.";
@@ -1398,7 +1483,7 @@
                 document.getElementById('time-remaining-display').innerText = "00:00:00";
                 hideUrgentBanner();
                 
-                if (isAdmin) {
+                if (isAdmin && !skipInteractionRender) {
                     // Need at least one other member before the round can start — single-person
                     // groups can't actually play (no one to vote on, no one to vote for).
                     if (currentGroupData.members.length < 2) {
@@ -1448,7 +1533,13 @@
                     showUrgentBanner('VOTE ON THE OTHERS', "You submitted — now vote to stay in the game.");
                 }
 
-                if (!hasSubmitted) {
+                if (!hasSubmitted && !skipInteractionRender) {
+                    // Preserve any draft text the user was typing before re-rendering.
+                    // A structural snapshot change (e.g. someone else just joined) could fire
+                    // mid-keystroke; reverting an in-progress link to empty would feel broken.
+                    const oldInput = document.getElementById('proof-link-input');
+                    const draftValue = oldInput ? oldInput.value : '';
+
                     interactionDiv.innerHTML = `
                         <div style="display: flex; gap: 6px; align-items: stretch; margin-bottom: 8px;">
                             <input type="text" inputmode="url" autocomplete="off" id="proof-link-input" placeholder="Paste your link here..." style="flex: 1; min-width: 0; margin: 0;">
@@ -1459,6 +1550,12 @@
                         <p style="font-size: 11px; color: #888; margin: 0 0 10px; line-height: 1.4;">⚠️ If your account is private or the post is hidden, voters won't see your proof — and you won't earn XP. Make sure the post is public before submitting.</p>
                         <button class="btn btn-accent" onclick="submitProof()" style="margin-top: 0;">Submit Proof</button>
                     `;
+
+                    // Restore the draft we captured above.
+                    if (draftValue) {
+                        const newInput = document.getElementById('proof-link-input');
+                        if (newInput) newInput.value = draftValue;
+                    }
 
                     // If we arrived from a PWA share_target with a pending link, auto-fill it now.
                     // consumePendingShare() returns the value AND clears it — so a back-and-forth
@@ -1474,7 +1571,7 @@
                         }
                         updatePendingShareBanner();
                     }
-                } else {
+                } else if (hasSubmitted && !skipInteractionRender) {
                     // Show submitter their own proof first
                     const mySub = submissions[currentUserName];
                     const myEmbedHtml = getEmbedHtml(mySub.link);
@@ -1517,6 +1614,24 @@
                         });
                     }
                     interactionDiv.innerHTML = votingHtml;
+                } else if (hasSubmitted && skipInteractionRender) {
+                    // Structural skip — vote-only update from someone else (or our own optimistic
+                    // already-applied vote). Patch the affected vote buttons in place without
+                    // tearing down the iframes. We walk current submissions and replace any
+                    // vote-button row whose corresponding vote now exists.
+                    otherSubmissions.forEach(other => {
+                        const sub = submissions[other];
+                        const myVote = sub.votes ? sub.votes[currentUserName] : null;
+                        if (myVote !== null && myVote !== undefined) {
+                            const voteEl = document.querySelector(`[data-vote-target="${CSS.escape(other)}"]`);
+                            if (voteEl) {
+                                const replacement = document.createElement('p');
+                                replacement.style.cssText = "font-size:12px; color:var(--text-main); margin:0;";
+                                replacement.textContent = `You awarded ${myVote} XP.`;
+                                voteEl.replaceWith(replacement);
+                            }
+                        }
+                    });
                 }
             }
 
@@ -1540,7 +1655,7 @@
                 challengeStatus: 'active',
                 challengeStartTime: Date.now()
             });
-            refreshGroupData();
+            // Listener (onSnapshot) will fire with the new state — no manual refresh needed.
         }
 
         function renderLeaderboard() {
@@ -1793,10 +1908,22 @@
             await updateDoc(groupRef, {
                 [`submissions.${currentUserName}`]: { link: linkInput, votes: {} }
             });
-            refreshGroupData();
+            // onSnapshot listener will fire — re-render happens automatically.
         }
 
         window.castVote = async function(targetUser, points) {
+            // Optimistically swap the vote buttons for "you awarded X" before the network
+            // round-trip completes. The onSnapshot listener will arrive shortly after and
+            // confirm the same state via the partial-render path — which checks if the
+            // vote already exists in DOM before patching, so this is idempotent.
+            const voteEl = document.querySelector(`[data-vote-target="${CSS.escape(targetUser)}"]`);
+            if (voteEl) {
+                const replacement = document.createElement('p');
+                replacement.style.cssText = "font-size:12px; color:var(--text-main); margin:0;";
+                replacement.textContent = `You awarded ${points} XP.`;
+                voteEl.replaceWith(replacement);
+            }
+
             const groupRef = doc(db, "groups", currentGroupId);
             await updateDoc(groupRef, {
                 [`submissions.${targetUser}.votes.${currentUserName}`]: points,
@@ -1812,7 +1939,8 @@
                 console.warn("Couldn't bump global totalXp for", targetUser, e.message);
             }
 
-            // Optimistic local-state update so subsequent renders & checks see the new vote.
+            // Optimistic local-state update so any synchronous code reading currentGroupData
+            // before the listener fires sees the new vote (e.g., banner / status logic).
             if (!currentGroupData.submissions) currentGroupData.submissions = {};
             if (!currentGroupData.submissions[targetUser]) currentGroupData.submissions[targetUser] = { votes: {} };
             if (!currentGroupData.submissions[targetUser].votes) currentGroupData.submissions[targetUser].votes = {};
@@ -1820,62 +1948,11 @@
             if (!currentGroupData.leaderboard) currentGroupData.leaderboard = {};
             currentGroupData.leaderboard[targetUser] = (currentGroupData.leaderboard[targetUser] || 0) + points;
 
-            // If this vote completes the round, do a full refresh so the resolved state takes over.
-            // Skipped when public voting is on - full timer must run out first.
-            if (!currentGroupData.publicVotingEnabled) {
-                const subs = currentGroupData.submissions;
-                const allComplete = currentGroupData.members.every(member => {
-                    if (!subs[member]) return false;
-                    const others = Object.keys(subs).filter(m => m !== member);
-                    if (others.length === 0) return true;
-                    return others.some(o => subs[o].votes && subs[o].votes[member] !== undefined);
-                });
-                if (allComplete) {
-                    return refreshGroupData();
-                }
-            }
-
-            // Otherwise: targeted DOM updates only - keeps every other iframe alive.
-            const voteEl = document.querySelector(`[data-vote-target="${CSS.escape(targetUser)}"]`);
-            if (voteEl) {
-                const replacement = document.createElement('p');
-                replacement.style.cssText = "font-size:12px; color:var(--text-main); margin:0;";
-                replacement.textContent = `You awarded ${points} XP.`;
-                voteEl.replaceWith(replacement);
-            } else {
-                // Fallback if the element disappeared somehow
-                refreshGroupData();
-                return;
-            }
-
-            // If this was the user's first vote, they're now safe - update status text and
-            // dismiss the urgent banner with a celebrate. We deliberately AVOID
-            // refreshGroupData() here so iframes (Instagram/TikTok embeds) don't reload —
-            // that would reset every video and feel jarring. So we mirror the relevant
-            // state changes manually: status text, banner, leaderboard.
-            //
-            // Detect "was the urgent banner showing the vote prompt?" via the live element,
-            // not text-matching a specific string — admin and guest see different status
-            // wording, but both share the same banner visibility state.
-            const banner = document.getElementById('urgent-action-banner');
-            const bannerWasShowing = banner && banner.style.display !== 'none' && !banner.classList.contains('celebrate');
-            if (bannerWasShowing) {
-                const statusEl = document.getElementById('survival-status');
-                const isAdminUser = currentGroupData.adminName === currentUserName;
-                if (statusEl) {
-                    statusEl.innerText = isAdminUser
-                        ? "👑 ADMIN: All set — XP locked in."
-                        : "✅ YOU'RE ALL SET — kick-proof.";
-                    statusEl.style.color = isAdminUser ? "var(--admin-color)" : "var(--text-main)";
-                }
-                // hideUrgentBanner reads the _urgentBannerWasVisible flag (set when the
-                // banner was shown for VOTE ON THE OTHERS) and plays the green celebrate
-                // transition before hiding. Same path as a full refresh would take.
-                hideUrgentBanner();
-            }
-
-            // Re-render leaderboard with new XP totals (no iframes during 'active' state, so cheap).
-            renderLeaderboard();
+            // Real-time listener handles the rest. The vote write triggers an onSnapshot
+            // callback → refreshGroupData → if this completes the round it resolves; if
+            // not, the partial-render path keeps iframes alive (see skipInteractionRender).
+            // All consistency — across this device and others in the group — flows through
+            // that single path.
         }
 
         window.resolveChallengeAndKick = async function() {
@@ -1928,7 +2005,7 @@
                 });
             }
 
-            refreshGroupData();
+            // Real-time listener fires on the status='resolved' write — UI updates automatically.
         }
 
         // Snapshots a resolved round into the global popularChallenges collection.
@@ -2195,7 +2272,7 @@
             await startNewRoundWithChallenge(randomTask);
 
             document.getElementById('btn-reroll').innerText = "Reroll & Draft New Round";
-            refreshGroupData();
+            // Listener picks up the new currentChallenge / cleared submissions automatically.
         });
 
         // Premium-only: set a custom challenge text instead of pulling from the category.
@@ -2227,7 +2304,7 @@
             try {
                 await startNewRoundWithChallenge(text, { isCustom: true, customAuthor: currentUserName });
                 textarea.value = "";
-                refreshGroupData();
+                // Listener handles the re-render.
             } catch (e) {
                 console.error("[custom challenge]", e);
                 alert("Couldn't set custom challenge. Try again.");
@@ -2246,7 +2323,8 @@
             await updateDoc(doc(db, "groups", currentGroupId), {
                 members: updatedMembers
             });
-            refreshGroupData();
+            // Listener fires for everyone in the group — kicked user's own client also gets
+            // the snapshot and bounces them out via the not-a-member check in refreshGroupData.
         }
 
         // Generic share helper — opens the native OS share sheet (one tap to WhatsApp /
@@ -2385,7 +2463,7 @@
                 currentCategoryId: categoryId
             });
             closeCategoryOverlay();
-            refreshGroupData();
+            // Listener picks up the change.
         }
 
         window.switchUser = function() {
