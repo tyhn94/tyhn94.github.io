@@ -593,6 +593,139 @@
             60%  { transform: scale(1.4) rotate(20deg); }
             100% { transform: scale(1) rotate(0deg); }
         }
+
+        /* === MODERNIZED DASHBOARD LAYOUT ===
+           Compact, challenge-first, collapsible-secondary. */
+
+        /* Header row replaces the previous "GROUP: x" h2.
+           Single line: ‹ back  |  group name  |  member count pill */
+        .dash-header {
+            display: flex; align-items: center; gap: 10px;
+            margin: 0 0 12px;
+        }
+        .dash-back {
+            background: transparent; border: 1px solid #555; color: #aaa;
+            font-family: inherit; font-size: 22px; font-weight: bold; line-height: 1;
+            width: 36px; height: 36px; padding: 0; cursor: pointer; flex-shrink: 0;
+            transition: all 0.15s;
+        }
+        @media (hover: hover) {
+            .dash-back:hover { border-color: var(--text-main); color: var(--text-main); }
+        }
+        .dash-back:active { opacity: 0.6; }
+        .dash-title { flex: 1; min-width: 0; overflow: hidden; }
+        .dash-title-name {
+            font-size: 18px; font-weight: bold; color: var(--text-main);
+            display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .dash-members-pill {
+            font-size: 12px; color: #aaa; padding: 4px 9px;
+            border: 1px solid #555; flex-shrink: 0;
+        }
+
+        /* Card spacing — tighten up from default. The default .card has plenty of padding;
+           on the dashboard we want to fit more on screen, so override locally. */
+        #screen-dashboard .card { margin: 12px 0; padding: 14px; }
+
+        /* THE CHALLENGE card — hero positioning, larger challenge text. */
+        .challenge-card { margin-top: 0 !important; }
+        .dash-h3 {
+            margin: 0 0 8px; font-size: 13px; font-weight: bold;
+            text-transform: uppercase; letter-spacing: 0.5px;
+        }
+        .challenge-text {
+            font-size: 15px; line-height: 1.4; margin: 8px 0 12px;
+            color: var(--text-main);
+        }
+        .challenge-status-row {
+            border-top: 1px dashed var(--timer-color);
+            padding-top: 10px;
+        }
+        .challenge-survival {
+            margin: 0 0 6px; font-size: 13px; text-align: center; font-weight: bold;
+        }
+        .challenge-card .timer-display { margin-top: 4px; }
+
+        /* Share row — invite + public vote tiles side by side. */
+        .dash-share-row {
+            display: flex; gap: 8px; margin: 12px 0;
+        }
+        .dash-share-tile {
+            flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px;
+            padding: 10px; font-family: inherit; font-size: 13px; font-weight: bold;
+            background: transparent; cursor: pointer; min-height: 44px;
+            transition: all 0.15s;
+            text-transform: none;
+        }
+        .dash-share-invite {
+            border: 1px solid var(--text-accent); color: var(--text-accent);
+        }
+        .dash-share-public {
+            border: 1px solid #ff66cc; color: #ff66cc;
+        }
+        .dash-share-public-off {
+            border: 1px dashed #444; color: #666;
+            cursor: default;
+        }
+        @media (hover: hover) {
+            .dash-share-invite:hover { background: var(--text-accent); color: var(--bg-color); }
+            .dash-share-public:hover { background: #ff66cc; color: var(--bg-color); }
+        }
+        .dash-share-tile:active:not(.dash-share-public-off) { opacity: 0.6; }
+        .dst-icon { font-size: 16px; }
+
+        /* Leaderboard — keep tight. Kick button styling preserved. */
+        .leaderboard-card { padding: 12px 14px !important; }
+
+        /* Collapsible cards (admin panel, premium). Use native <details>/<summary> for free
+           keyboard support and animation-less, jank-free open/close. */
+        .collapse-card { padding: 0 !important; }
+        .collapse-card .collapse-summary {
+            list-style: none; cursor: pointer;
+            padding: 12px 14px; font-size: 13px; font-weight: bold;
+            text-transform: uppercase; letter-spacing: 0.5px;
+            display: flex; justify-content: space-between; align-items: center;
+            user-select: none;
+        }
+        .collapse-card .collapse-summary::-webkit-details-marker { display: none; }
+        .collapse-chevron {
+            font-size: 14px; transition: transform 0.2s ease-out;
+        }
+        .collapse-card[open] .collapse-chevron { transform: rotate(180deg); }
+        .collapse-body { padding: 0 14px 14px; }
+
+        /* Admin panel rows — compact & uniform. */
+        .admin-row {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 10px; gap: 10px;
+        }
+        .admin-row label {
+            font-size: 13px; color: #ccc;
+        }
+        .admin-row input[type="number"] {
+            width: 80px; margin: 0; text-align: center; padding: 6px;
+        }
+        .admin-checkbox {
+            font-size: 13px; display: flex; align-items: center; gap: 10px;
+            cursor: pointer; margin-top: 8px;
+        }
+        .admin-checkbox input[type="checkbox"] { width: 18px; height: 18px; }
+
+        /* Bottom action row — reroll + history side-by-side. */
+        .dash-actions {
+            display: flex; gap: 8px; margin: 14px 0 8px;
+        }
+        .dash-actions .btn { margin: 0; }
+        .dash-secondary {
+            border-color: var(--timer-color) !important;
+            color: var(--timer-color) !important;
+        }
+        @media (hover: hover) {
+            .dash-secondary:hover:not(:disabled) {
+                background: var(--timer-color) !important;
+                color: var(--bg-color) !important;
+            }
+        }
     </style>
 </head>
 <body>
@@ -703,13 +836,18 @@
         </div>
 
         <div id="screen-dashboard" class="screen">
-            <h2>GROUP: <span id="display-group"></span></h2>
+            <!-- Compact dashboard header: back button | group name | member count.
+                 Replaces the previous "GROUP: x" h2 + huge member-count display. -->
+            <div class="dash-header">
+                <button class="dash-back" onclick="renderMyGroups()" aria-label="Back to my groups">‹</button>
+                <div class="dash-title">
+                    <span class="dash-title-name" id="display-group"></span>
+                </div>
+                <div class="dash-members-pill"><span id="current-count">0</span>/<span id="max-count">10</span></div>
+            </div>
 
             <!-- Sticky urgent action banner. Hidden by default; refreshGroupData reveals it
-                 when the user must submit or vote to survive. Pulses gently so it's caught
-                 by peripheral vision without being annoying. Two-line layout: bold action
-                 line + faint reminder of the consequence ("or you'll be kicked"). Tap
-                 scrolls down to The Challenge card so the user can act immediately. -->
+                 when the user must submit or vote to survive. -->
             <div id="urgent-action-banner" class="urgent-banner" style="display: none;" onclick="scrollToChallengeCard()">
                 <div class="urgent-banner-line">
                     <span class="urgent-banner-icon">⚠️</span>
@@ -719,96 +857,111 @@
             </div>
 
             <!-- Activity feed: real-time toasts that announce what other people in the group
-                 just did (joined, submitted, voted, kick'd, etc). Sticky below the urgent
-                 banner so scrolling doesn't lose them. Pointer-events:none lets clicks pass
-                 through to whatever card is behind. -->
+                 just did (joined, submitted, voted, kick'd, etc). -->
             <div id="activity-feed" class="activity-feed"></div>
-            
-            <div id="admin-panel" class="card" style="display: none; border-color: var(--admin-color); position: relative;">
-                <h3 style="margin-top:0; font-size:14px; color:var(--admin-color);">> ADMIN PANEL</h3>
-                <p id="admin-lock-notice" style="display: none; font-size: 12px; color: var(--admin-color); border: 1px dashed var(--admin-color); padding: 8px; margin: 0 0 12px; text-align: center;">
-                    🔒 Settings locked while challenge is active. Reroll to draft a new round.
-                </p>
-                <fieldset id="admin-settings-fieldset" style="border: none; padding: 0; margin: 0;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                    <label style="font-size: 14px;">Max Members:</label>
-                    <input type="number" id="max-members-input" style="width: 80px; margin: 0; text-align: center;" min="1" max="10">
-                </div>
-                
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                    <label style="font-size: 14px;">Time Limit:</label>
-                    <div style="display: flex; gap: 5px;">
-                        <input type="number" id="challenge-hours-input" placeholder="Hrs" style="width: 60px; margin: 0; text-align: center;" min="0" max="168">
-                        <input type="number" id="challenge-mins-input" placeholder="Mins" style="width: 60px; margin: 0; text-align: center;" min="0" max="59">
-                    </div>
-                </div>
 
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 10px;">
-                    <label style="font-size: 14px;">Challenge Category:</label>
-                    <button type="button" id="btn-pick-category" class="category-current-pill">
-                        <span id="current-category-emoji">🎲</span>
-                        <span id="current-category-name">Loading...</span>
-                        <span style="margin-left: 4px; opacity: 0.6;">▾</span>
-                    </button>
-                </div>
+            <!-- THE CHALLENGE — moved to the top of the dashboard. Above-the-fold focus:
+                 challenge text, countdown, and the user's action UI (submit / vote) are
+                 the whole point of being on this screen. -->
+            <div class="card challenge-card" style="border-color: var(--timer-color);">
+                <h3 class="dash-h3" style="color: var(--timer-color); margin-top: 0;">> THE CHALLENGE</h3>
+                <p id="daily-challengeText" class="challenge-text">Loading...</p>
 
-                <label style="font-size: 14px; display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                    <input type="checkbox" id="admin-invite-checkbox" style="width: 18px; height: 18px;">
-                    Only Admin Can Invite
-                </label>
-                <label style="font-size: 14px; display: flex; align-items: center; gap: 10px; cursor: pointer; margin-top: 8px;">
-                    <input type="checkbox" id="public-voting-checkbox" style="width: 18px; height: 18px;">
-                    Enable Public Voting
-                </label>
-                <p style="font-size: 11px; color: #888; margin: 5px 0 0 28px;">Anyone with the public link can vote anonymously. Round won't end early - waits for full timer. Resolved rounds are featured in the global Most Popular feed.</p>
-                <p id="admin-save-status" style="font-size: 11px; color: var(--text-main); margin: 12px 0 0; text-align: right; min-height: 14px; opacity: 0; transition: opacity 0.2s;">✓ Saved</p>
-                </fieldset>
-            </div>
-
-            <div id="invite-section" class="card" style="border-color: var(--text-accent); text-align: center;">
-                <p style="margin-top: 0; font-size: 14px;">> GATHER THE SQUAD</p>
-                <button class="btn btn-accent" id="btn-copy-invite">📤 Share Invite</button>
-            </div>
-
-            <div id="public-vote-status" class="card" style="display: none; border-color: #ff66cc; text-align: center;">
-                <p style="margin-top: 0; font-size: 14px; color: #ff66cc;">> PUBLIC VOTING <span id="pv-status-label">OFF</span></p>
-                <p id="pv-status-desc" style="font-size: 11px; color: #888; margin: 5px 0 10px;"></p>
-                <button class="btn" id="btn-copy-public-vote" style="border-color: #ff66cc; color: #ff66cc; display:none;">📤 Share Public Vote Link</button>
-            </div>
-
-            <div class="card">
-                <h3 style="margin-top:0; font-size:14px; display:flex; justify-content:space-between;">
-                    <span>> LEADERBOARD</span>
-                    <span style="color:#888;"><span id="current-count">0</span> / <span id="max-count">10</span></span>
-                </h3>
-                <ul id="member-list-ui" class="member-list"></ul>
-            </div>
-            
-            <div class="card" style="border-color: var(--timer-color);">
-                <h3 style="margin-top: 0; color: var(--timer-color);">> THE CHALLENGE</h3>
-                <p id="daily-challengeText">Loading...</p>
-                
-                <div style="border-top: 1px dashed var(--timer-color); margin-top: 15px; padding-top: 10px;">
-                    <p id="survival-status" style="margin:0; font-size: 14px; text-align: center; font-weight:bold;"></p>
+                <div class="challenge-status-row">
+                    <p id="survival-status" class="challenge-survival"></p>
                     <div id="time-remaining-display" class="timer-display">--:--:--</div>
                 </div>
 
-                <div id="interaction-section" style="margin-top: 15px;">
-                    </div>
+                <div id="interaction-section" style="margin-top: 12px;"></div>
             </div>
 
-            <button class="btn" style="border-color: var(--timer-color); color: var(--timer-color);" onclick="window.showHistory()">View Past Challenges</button>
-            
-            <div id="superuser-panel" class="card" style="display: none; border-color: #ffd700; background: #1a1500;">
-                <h3 style="margin-top:0; font-size:14px; color:#ffd700;">> 🌟 PREMIUM: CUSTOM CHALLENGE</h3>
-                <p style="font-size: 11px; color: #888; margin: 0 0 10px;">Write your own dare instead of pulling from the category. Starts a fresh round (resets the leaderboard, archives the old challenge).</p>
-                <textarea id="custom-challenge-input" placeholder="e.g., Send a 5-second voice memo of your worst karaoke. No re-takes." rows="3"
-                    style="width: 100%; padding: 10px; background: #000; border: 1px solid #ffd700; color: var(--text-main); font-family: inherit; font-size: 13px; resize: vertical; outline: none; box-sizing: border-box;"></textarea>
-                <button class="btn" id="btn-set-custom-challenge" style="border-color: #ffd700; color: #ffd700; margin-top: 10px;">Set Custom Challenge</button>
+            <!-- Compact share row: invite + public-vote actions side-by-side instead of two
+                 separate full-width cards. Public-vote tile shows status + share in one. -->
+            <div class="dash-share-row">
+                <button class="dash-share-tile dash-share-invite" id="btn-copy-invite">
+                    <span class="dst-icon">📤</span>
+                    <span class="dst-label">Invite</span>
+                </button>
+                <button class="dash-share-tile dash-share-public" id="btn-copy-public-vote" style="display:none;">
+                    <span class="dst-icon">🌐</span>
+                    <span class="dst-label">Public vote</span>
+                </button>
+                <div class="dash-share-tile dash-share-public-off" id="public-vote-off-tile" style="display:none;">
+                    <span class="dst-icon" style="opacity:0.4;">🔒</span>
+                    <span class="dst-label" style="opacity:0.6;">Public vote: off</span>
+                </div>
             </div>
 
-            <button class="btn btn-admin" id="btn-reroll" style="display: none;">Reroll & Draft New Round</button>
-            <button class="btn" style="border-color: #555; color: #555;" onclick="renderMyGroups()">< Back to My Groups</button>
+            <!-- Leaderboard — slimmer than before, member kick controls preserved. -->
+            <div class="card leaderboard-card">
+                <h3 class="dash-h3">> LEADERBOARD</h3>
+                <ul id="member-list-ui" class="member-list"></ul>
+            </div>
+
+            <!-- ADMIN PANEL — collapsible. Default closed so it doesn't dominate the screen
+                 every time an admin opens the dashboard. Click the header to expand/collapse. -->
+            <details id="admin-panel" class="card collapse-card" style="display: none; border-color: var(--admin-color);">
+                <summary class="collapse-summary" style="color: var(--admin-color);">
+                    <span>⚙ Admin Settings</span>
+                    <span class="collapse-chevron">▾</span>
+                </summary>
+                <div class="collapse-body">
+                    <p id="admin-lock-notice" style="display: none; font-size: 12px; color: var(--admin-color); border: 1px dashed var(--admin-color); padding: 8px; margin: 0 0 12px; text-align: center;">
+                        🔒 Settings locked while challenge is active. Reroll to draft a new round.
+                    </p>
+                    <fieldset id="admin-settings-fieldset" style="border: none; padding: 0; margin: 0;">
+                        <div class="admin-row">
+                            <label>Max Members:</label>
+                            <input type="number" id="max-members-input" min="1" max="10">
+                        </div>
+                        <div class="admin-row">
+                            <label>Time Limit:</label>
+                            <div style="display: flex; gap: 5px;">
+                                <input type="number" id="challenge-hours-input" placeholder="Hrs" style="width: 60px;" min="0" max="168">
+                                <input type="number" id="challenge-mins-input" placeholder="Mins" style="width: 60px;" min="0" max="59">
+                            </div>
+                        </div>
+                        <div class="admin-row">
+                            <label>Category:</label>
+                            <button type="button" id="btn-pick-category" class="category-current-pill">
+                                <span id="current-category-emoji">🎲</span>
+                                <span id="current-category-name">Loading...</span>
+                                <span style="margin-left: 4px; opacity: 0.6;">▾</span>
+                            </button>
+                        </div>
+                        <label class="admin-checkbox">
+                            <input type="checkbox" id="admin-invite-checkbox">
+                            Only Admin Can Invite
+                        </label>
+                        <label class="admin-checkbox">
+                            <input type="checkbox" id="public-voting-checkbox">
+                            Enable Public Voting
+                        </label>
+                        <p style="font-size: 11px; color: #888; margin: 5px 0 0 28px;">Anyone with the public link can vote anonymously. Round won't end early. Resolved rounds appear in Most Popular.</p>
+                        <p id="admin-save-status" style="font-size: 11px; color: var(--text-main); margin: 12px 0 0; text-align: right; min-height: 14px; opacity: 0; transition: opacity 0.2s;">✓ Saved</p>
+                    </fieldset>
+                </div>
+            </details>
+
+            <!-- PREMIUM CUSTOM CHALLENGE — also collapsible. Visible only for premium users. -->
+            <details id="superuser-panel" class="card collapse-card" style="display: none; border-color: #ffd700; background: #1a1500;">
+                <summary class="collapse-summary" style="color: #ffd700;">
+                    <span>🌟 Premium: Custom Challenge</span>
+                    <span class="collapse-chevron">▾</span>
+                </summary>
+                <div class="collapse-body">
+                    <p style="font-size: 11px; color: #888; margin: 0 0 10px;">Write your own dare. Starts a fresh round.</p>
+                    <textarea id="custom-challenge-input" placeholder="e.g., Send a 5-second voice memo of your worst karaoke." rows="3"
+                        style="width: 100%; padding: 10px; background: #000; border: 1px solid #ffd700; color: var(--text-main); font-family: inherit; font-size: 13px; resize: vertical; outline: none; box-sizing: border-box;"></textarea>
+                    <button class="btn" id="btn-set-custom-challenge" style="border-color: #ffd700; color: #ffd700; margin-top: 10px;">Set Custom Challenge</button>
+                </div>
+            </details>
+
+            <!-- Bottom action row: reroll (admin), history. Compact horizontal layout. -->
+            <div class="dash-actions">
+                <button class="btn btn-admin" id="btn-reroll" style="display: none;">↻ Reroll Round</button>
+                <button class="btn dash-secondary" onclick="window.showHistory()">📜 Past Rounds</button>
+            </div>
         </div>
 
         <div id="screen-public-vote" class="screen">
@@ -1707,30 +1860,24 @@
                 document.getElementById('admin-lock-notice').style.display = settingsLocked ? 'block' : 'none';
             }
 
-            if(currentGroupData.adminOnlyInvites && !isAdmin) {
-                document.getElementById('invite-section').style.display = 'none';
-            } else {
-                document.getElementById('invite-section').style.display = 'block';
-            }
+            // Invite tile — hidden if admin-only-invites is on and user isn't admin.
+            const inviteBtn = document.getElementById('btn-copy-invite');
+            inviteBtn.style.display = (currentGroupData.adminOnlyInvites && !isAdmin) ? 'none' : 'flex';
 
-            // Public voting status - visible to ALL members so they know the rules.
-            const pvCard = document.getElementById('public-vote-status');
-            const pvLabel = document.getElementById('pv-status-label');
-            const pvDesc = document.getElementById('pv-status-desc');
-            const pvCopyBtn = document.getElementById('btn-copy-public-vote');
-            pvCard.style.display = 'block';
+            // Public voting tile — three states:
+            //   1. Public voting ON  → coloured "Public vote" share tile (active button).
+            //   2. Public voting OFF → muted "Public vote: off" placeholder so members
+            //      know the feature exists and admins remember to flip it on.
+            //   3. Public voting OFF + non-admin → hide the placeholder entirely (they
+            //      can't change it, no info value).
+            const publicBtn = document.getElementById('btn-copy-public-vote');
+            const publicOff = document.getElementById('public-vote-off-tile');
             if (currentGroupData.publicVotingEnabled) {
-                pvCard.style.borderColor = '#ff66cc';
-                pvLabel.innerText = 'ON';
-                pvLabel.style.color = '#ff66cc';
-                pvDesc.innerText = 'Outsiders can vote anonymously via the public link. Round runs the full timer.';
-                pvCopyBtn.style.display = 'block'; // ALL members can share - viral.
+                publicBtn.style.display = 'flex';
+                publicOff.style.display = 'none';
             } else {
-                pvCard.style.borderColor = '#444';
-                pvLabel.innerText = 'OFF';
-                pvLabel.style.color = '#888';
-                pvDesc.innerText = isAdmin ? 'Toggle it on in the admin panel above to let outsiders vote.' : 'Only admin can enable this.';
-                pvCopyBtn.style.display = 'none';
+                publicBtn.style.display = 'none';
+                publicOff.style.display = isAdmin ? 'flex' : 'none';
             }
 
             const hasSubmitted = !!submissions[currentUserName];
@@ -2417,22 +2564,18 @@
                     document.getElementById('max-count').innerText = updates.maxMembers;
                 }
                 if ('publicVotingEnabled' in updates) {
-                    const pvCard = document.getElementById('public-vote-status');
-                    const pvLabel = document.getElementById('pv-status-label');
-                    const pvDesc = document.getElementById('pv-status-desc');
-                    const pvCopyBtn = document.getElementById('btn-copy-public-vote');
+                    // Mirror the visibility logic in refreshGroupData — ON shows the share
+                    // tile, OFF shows the muted placeholder (admin only). Avoids a full
+                    // re-render so admin's typing/focus elsewhere isn't disturbed.
+                    const publicBtn = document.getElementById('btn-copy-public-vote');
+                    const publicOff = document.getElementById('public-vote-off-tile');
                     if (updates.publicVotingEnabled) {
-                        pvCard.style.borderColor = '#ff66cc';
-                        pvLabel.innerText = 'ON';
-                        pvLabel.style.color = '#ff66cc';
-                        pvDesc.innerText = 'Outsiders can vote anonymously via the public link. Round runs the full timer.';
-                        pvCopyBtn.style.display = 'block';
+                        if (publicBtn) publicBtn.style.display = 'flex';
+                        if (publicOff) publicOff.style.display = 'none';
                     } else {
-                        pvCard.style.borderColor = '#444';
-                        pvLabel.innerText = 'OFF';
-                        pvLabel.style.color = '#888';
-                        pvDesc.innerText = '';
-                        pvCopyBtn.style.display = 'none';
+                        if (publicBtn) publicBtn.style.display = 'none';
+                        // The toggle is being changed BY the admin — they can see the off-tile.
+                        if (publicOff) publicOff.style.display = 'flex';
                     }
                 }
 
@@ -3864,10 +4007,8 @@
         }
 
         document.addEventListener('click', (e) => {
-            if (!bgmStarted) {
-                initGenerativeMusic();
-            }
-
+            // Background music auto-start removed by user request — initGenerativeMusic()
+            // function still exists in this file if we ever want to bring it back.
             if (e.target.closest('.btn, .kick-btn, .group-delete-btn, .category-card, .category-current-pill, #sound-toggle, button')) {
                 playClick();
             }
