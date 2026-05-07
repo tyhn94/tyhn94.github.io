@@ -7,7 +7,10 @@
     <!-- PWA: makes the app installable + lets share_target receive Instagram/TikTok shares on Android.
          iOS Safari ignores share_target but still honors apple-* tags for standalone install. -->
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#33ff00">
+    <!-- theme-color drives the colour iOS Safari/Chrome paints in the URL bar area and the
+         "rubber-band" overscroll regions. Keeping it at the dashboard's dark bg makes the
+         status-bar zone blend into the app instead of showing as a separate green block. -->
+    <meta name="theme-color" content="#0d0d0d">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="DareDrop">
@@ -25,6 +28,12 @@
             --crt-glow: 0 0 8px rgba(51, 255, 0, 0.6);
         }
         * { box-sizing: border-box; }
+        /* html bg matters too — iOS Safari uses it to fill the overscroll bounce area
+           above the page when you pull down, AND the area behind the dynamic island
+           on newer iPhones. Without this the overscroll showed white/green flashes. */
+        html {
+            background-color: var(--bg-color);
+        }
         body {
             background-color: var(--bg-color); color: var(--text-main);
             font-family: 'Google Sans Code', monospace;
