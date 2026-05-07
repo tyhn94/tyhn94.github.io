@@ -466,11 +466,13 @@
 
         /* === ACTIVITY FEED ===
            Stack of transient toasts announcing what others in the group just did.
-           Sticky so scrolling doesn't strand them off-screen. Pointer-events:none
-           on the container lets the user keep tapping cards behind it; individual
-           toasts re-enable pointer events only on themselves if interactive. */
+           Sticky so scrolling doesn't strand them off-screen. Z-index ABOVE the urgent
+           banner — live activity events are more important to surface than the user's
+           own status reminder; the banner's job is patience, the feed's job is news.
+           Reverse color scheme (light bg + dark text) makes toasts pop against the
+           dark dashboard so the user can't miss them. */
         .activity-feed {
-            position: sticky; top: 0; z-index: 18;
+            position: sticky; top: 0; z-index: 25;
             margin: 0 -20px; padding: 0;
             display: flex; flex-direction: column-reverse; /* newest on top */
             gap: 6px;
@@ -478,27 +480,45 @@
         }
         .activity-feed:empty { display: none; }
         .activity-toast {
-            background: linear-gradient(180deg, #001e0e 0%, #00120a 100%);
-            border-left: 3px solid var(--text-main);
-            box-shadow: 0 2px 12px rgba(51, 255, 0, 0.25);
+            /* Reverse scheme: bright background on the otherwise-dark dashboard. The
+               accent variants below override the bg per event type so each type also
+               carries a tonal cue. */
+            background: var(--text-main);
+            color: var(--bg-color);
+            border-left: 4px solid var(--bg-color);
+            box-shadow: 0 3px 14px rgba(51, 255, 0, 0.5);
             padding: 10px 14px;
-            margin: 0 14px; /* slight inset so the toasts don't span edge-to-edge */
+            margin: 0 14px;
             display: flex; align-items: center; gap: 10px;
-            font-size: 12px; color: var(--text-main);
+            font-size: 12px; font-weight: bold;
             transform-origin: top center;
             animation: toastIn 0.32s cubic-bezier(0.34, 1.56, 0.64, 1) forwards,
-                       toastOut 0.45s ease-in 3.6s forwards; /* in, hold, out */
+                       toastOut 0.45s ease-in 3.6s forwards;
         }
         .activity-toast .at-icon { font-size: 16px; flex-shrink: 0; }
         .activity-toast .at-text { line-height: 1.3; flex: 1; min-width: 0; }
-        .activity-toast .at-text strong { color: var(--text-accent); }
-        /* Variant accents — different events get different left-border colors so users
-           can read the feed at a glance: green (positive), pink (warning/kick),
-           cyan (timer/state). */
-        .activity-toast.at-positive { border-left-color: var(--text-main); }
-        .activity-toast.at-warning  { border-left-color: var(--text-accent); box-shadow: 0 2px 12px rgba(255, 0, 102, 0.25); }
-        .activity-toast.at-state    { border-left-color: var(--timer-color);  box-shadow: 0 2px 12px rgba(0, 240, 255, 0.25); }
-        .activity-toast.at-admin    { border-left-color: var(--admin-color);  box-shadow: 0 2px 12px rgba(255, 165, 0, 0.25); }
+        /* Username/highlight in the dark accent so it stands out against the bright bg.
+           Inverse of the dark-mode treatment we use elsewhere. */
+        .activity-toast .at-text strong { color: var(--bg-color); text-decoration: underline; text-underline-offset: 2px; }
+        /* Variant accents — each event type gets its own bright background tone, so the
+           user can read the feed type at a glance even before reading the text. */
+        .activity-toast.at-positive {
+            background: var(--text-main);
+            box-shadow: 0 3px 14px rgba(51, 255, 0, 0.55);
+        }
+        .activity-toast.at-warning {
+            background: var(--text-accent); color: #fff;
+            box-shadow: 0 3px 14px rgba(255, 0, 102, 0.55);
+        }
+        .activity-toast.at-warning .at-text strong { color: #fff; }
+        .activity-toast.at-state {
+            background: var(--timer-color);
+            box-shadow: 0 3px 14px rgba(0, 240, 255, 0.55);
+        }
+        .activity-toast.at-admin {
+            background: var(--admin-color);
+            box-shadow: 0 3px 14px rgba(255, 165, 0, 0.55);
+        }
         @keyframes toastIn {
             0%   { opacity: 0; transform: scale(0.6) translateY(-10px); }
             70%  { opacity: 1; transform: scale(1.04); }
@@ -1726,6 +1746,11 @@
                 statusEl.style.color = "var(--admin-color)";
                 document.getElementById('time-remaining-display').innerText = "00:00:00";
                 hideUrgentBanner();
+                // Make sure no stale countdown is still ticking from a previous round.
+                if (countdownTimer) {
+                    clearInterval(countdownTimer);
+                    countdownTimer = null;
+                }
                 
                 if (isAdmin && !skipInteractionRender) {
                     // Need at least one other member before the round can start — single-person
@@ -1743,6 +1768,15 @@
                 statusEl.innerText = "ROUND OVER! Waiting for admin to draft new round.";
                 statusEl.style.color = "#888";
                 hideUrgentBanner();
+                // Stop the countdown explicitly and reset the display. Without this the
+                // last "00:00:42" frame stayed frozen on screen even though the timer
+                // had stopped — gave the impression the countdown was still running.
+                if (countdownTimer) {
+                    clearInterval(countdownTimer);
+                    countdownTimer = null;
+                }
+                document.getElementById('time-remaining-display').innerText = "--:--:--";
+                document.getElementById('time-remaining-display').style.color = "#666";
             } else {
                 // Admin gets a different framing: they're protected from kicks (so the
                 // "or you'll get kicked!" stick doesn't apply), but the round won't end
@@ -1884,7 +1918,11 @@
             if(status === 'active') {
                 startCountdown();
             } else if (countdownTimer) {
+                // Defensive: status is no longer active (resolved/pending) but a timer
+                // is still alive somehow — clear it. The status branches above also do
+                // this, but this catches any edge case where neither branch ran.
                 clearInterval(countdownTimer);
+                countdownTimer = null;
             }
         }
 
@@ -2340,6 +2378,7 @@
                     displayEl.innerText = "TIME'S UP! RESOLVING...";
                     displayEl.style.color = "var(--text-accent)";
                     clearInterval(countdownTimer);
+                    countdownTimer = null;
                     
                     if(currentGroupData.challengeStatus === 'active') {
                         resolveChallengeAndKick();
