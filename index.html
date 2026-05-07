@@ -463,6 +463,59 @@
         @media (prefers-reduced-motion: reduce) {
             .urgent-banner, .urgent-banner-icon { animation: none; }
         }
+
+        /* === ACTIVITY FEED ===
+           Stack of transient toasts announcing what others in the group just did.
+           Sticky so scrolling doesn't strand them off-screen. Pointer-events:none
+           on the container lets the user keep tapping cards behind it; individual
+           toasts re-enable pointer events only on themselves if interactive. */
+        .activity-feed {
+            position: sticky; top: 0; z-index: 18;
+            margin: 0 -20px; padding: 0;
+            display: flex; flex-direction: column-reverse; /* newest on top */
+            gap: 6px;
+            pointer-events: none;
+        }
+        .activity-feed:empty { display: none; }
+        .activity-toast {
+            background: linear-gradient(180deg, #001e0e 0%, #00120a 100%);
+            border-left: 3px solid var(--text-main);
+            box-shadow: 0 2px 12px rgba(51, 255, 0, 0.25);
+            padding: 10px 14px;
+            margin: 0 14px; /* slight inset so the toasts don't span edge-to-edge */
+            display: flex; align-items: center; gap: 10px;
+            font-size: 12px; color: var(--text-main);
+            transform-origin: top center;
+            animation: toastIn 0.32s cubic-bezier(0.34, 1.56, 0.64, 1) forwards,
+                       toastOut 0.45s ease-in 3.6s forwards; /* in, hold, out */
+        }
+        .activity-toast .at-icon { font-size: 16px; flex-shrink: 0; }
+        .activity-toast .at-text { line-height: 1.3; flex: 1; min-width: 0; }
+        .activity-toast .at-text strong { color: var(--text-accent); }
+        /* Variant accents — different events get different left-border colors so users
+           can read the feed at a glance: green (positive), pink (warning/kick),
+           cyan (timer/state). */
+        .activity-toast.at-positive { border-left-color: var(--text-main); }
+        .activity-toast.at-warning  { border-left-color: var(--text-accent); box-shadow: 0 2px 12px rgba(255, 0, 102, 0.25); }
+        .activity-toast.at-state    { border-left-color: var(--timer-color);  box-shadow: 0 2px 12px rgba(0, 240, 255, 0.25); }
+        .activity-toast.at-admin    { border-left-color: var(--admin-color);  box-shadow: 0 2px 12px rgba(255, 165, 0, 0.25); }
+        @keyframes toastIn {
+            0%   { opacity: 0; transform: scale(0.6) translateY(-10px); }
+            70%  { opacity: 1; transform: scale(1.04); }
+            100% { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        @keyframes toastOut {
+            0%   { opacity: 1; transform: scale(1); max-height: 80px; padding-top: 10px; padding-bottom: 10px; margin-top: 0; }
+            100% { opacity: 0; transform: scale(0.95); max-height: 0; padding-top: 0; padding-bottom: 0; margin-top: 0; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .activity-toast {
+                animation: toastInReduced 0.2s ease-out forwards,
+                           toastOutReduced 0.3s ease-in 3.6s forwards;
+            }
+            @keyframes toastInReduced { from { opacity: 0; } to { opacity: 1; } }
+            @keyframes toastOutReduced { from { opacity: 1; } to { opacity: 0; } }
+        }
         /* Celebrate state — flips colour from red-alert to green-success when the user
            completes their required action (submit + at least one vote). 2.4-second
            hold before the banner hides itself. Glow-in-then-fade for satisfying close. */
@@ -635,6 +688,12 @@
                 </div>
                 <div id="urgent-banner-sub" class="urgent-banner-sub">Tap to act before the timer ends.</div>
             </div>
+
+            <!-- Activity feed: real-time toasts that announce what other people in the group
+                 just did (joined, submitted, voted, kick'd, etc). Sticky below the urgent
+                 banner so scrolling doesn't lose them. Pointer-events:none lets clicks pass
+                 through to whatever card is behind. -->
+            <div id="activity-feed" class="activity-feed"></div>
             
             <div id="admin-panel" class="card" style="display: none; border-color: var(--admin-color); position: relative;">
                 <h3 style="margin-top:0; font-size:14px; color:var(--admin-color);">> ADMIN PANEL</h3>
@@ -1270,12 +1329,22 @@
                 _groupUnsubscribe();
                 _groupUnsubscribe = null;
             }
+            // Clear the snapshot cache so the NEXT group we open doesn't compare its first
+            // snapshot against the last one of this group — that diff would falsely emit
+            // "X joined / Y submitted" toasts for what is actually the existing state of
+            // the new group.
+            _lastSnapshotData = null;
         }
 
         async function openDashboard(groupId) {
             // If we're switching groups, drop the old listener first to avoid
             // stale callbacks firing against the new group's UI.
             teardownGroupListener();
+
+            // Clear any leftover toasts from the previous group — they'd be confusing context
+            // ("X joined" but X isn't even in this new group).
+            const feed = document.getElementById('activity-feed');
+            if (feed) feed.innerHTML = '';
 
             currentGroupId = groupId;
             // Persist last visited group so a page refresh resumes here instead of bouncing to My Groups.
@@ -1331,6 +1400,174 @@
         // Cache the previous snapshot so the listener can decide between full and partial render.
         let _lastSnapshotData = null;
 
+        // ============================================================
+        // ACTIVITY FEED — diff snapshots, emit toasts for what changed.
+        // Quiet about user's own actions (they already know what they did).
+        // Voting events deliberately skipped: in a 5-person round each member
+        // votes 4 times, that's 20 toasts in 30 seconds → spam. Submissions,
+        // joins/leaves, status changes are the meaningful events.
+        // ============================================================
+        function detectAndAnnounceActivity(prev, next) {
+            const me = currentUserName;
+            const prevMembers = new Set(prev.members || []);
+            const nextMembers = new Set(next.members || []);
+
+            // — JOINS — anyone in next but not in prev (excluding self).
+            nextMembers.forEach(m => {
+                if (!prevMembers.has(m) && m !== me) {
+                    showActivityToast({
+                        text: `<strong>${escapeHtml(m)}</strong> joined the group`,
+                        icon: '➕',
+                        variant: 'positive',
+                        sound: 'join'
+                    });
+                }
+            });
+
+            // — LEAVES / KICKS — anyone in prev but not in next (excluding self,
+            // since kicked-self is handled by the dashboard bounce in refreshGroupData).
+            prevMembers.forEach(m => {
+                if (!nextMembers.has(m) && m !== me) {
+                    showActivityToast({
+                        text: `<strong>${escapeHtml(m)}</strong> was removed`,
+                        icon: '👋',
+                        variant: 'warning',
+                        sound: 'leave'
+                    });
+                }
+            });
+
+            // — STATUS TRANSITIONS — challenge lifecycle. Filter the noisy "pending → pending"
+            // case (no actual change). Each transition gets its own message + tone.
+            if (prev.challengeStatus !== next.challengeStatus) {
+                if (next.challengeStatus === 'active') {
+                    showActivityToast({
+                        text: `Challenge started! Timer is running.`,
+                        icon: '🚀',
+                        variant: 'state',
+                        sound: 'start'
+                    });
+                } else if (next.challengeStatus === 'resolved') {
+                    showActivityToast({
+                        text: `Round resolved. Check the leaderboard.`,
+                        icon: '🏁',
+                        variant: 'state',
+                        sound: 'resolve'
+                    });
+                } else if (next.challengeStatus === 'pending' && prev.challengeStatus === 'resolved') {
+                    showActivityToast({
+                        text: `Admin drafted a new round.`,
+                        icon: '🎲',
+                        variant: 'admin',
+                        sound: 'state'
+                    });
+                }
+            }
+
+            // — CHALLENGE TEXT CHANGE (mid-round reroll, rare but possible).
+            // Only announce if status didn't also change (already covered by status branch).
+            if (prev.challengeStatus === next.challengeStatus &&
+                prev.currentChallenge !== next.currentChallenge &&
+                next.currentChallenge) {
+                showActivityToast({
+                    text: `Challenge rerolled by admin.`,
+                    icon: '🔁',
+                    variant: 'admin',
+                    sound: 'state'
+                });
+            }
+
+            // — NEW SUBMISSIONS — keys added to submissions object (excluding self).
+            const prevSubKeys = new Set(Object.keys(prev.submissions || {}));
+            const nextSubKeys = new Set(Object.keys(next.submissions || {}));
+            nextSubKeys.forEach(k => {
+                if (!prevSubKeys.has(k) && k !== me) {
+                    showActivityToast({
+                        text: `<strong>${escapeHtml(k)}</strong> submitted their proof`,
+                        icon: '📎',
+                        variant: 'positive',
+                        sound: 'submit'
+                    });
+                }
+            });
+
+            // Public voting toggle — admins flipping it deserves a heads-up to other members
+            // (changes the round semantics — public link starts working / stops working).
+            if (!!prev.publicVotingEnabled !== !!next.publicVotingEnabled) {
+                showActivityToast({
+                    text: next.publicVotingEnabled
+                        ? `Public voting is now ON for this round.`
+                        : `Public voting was turned off.`,
+                    icon: next.publicVotingEnabled ? '🌐' : '🔒',
+                    variant: 'admin',
+                    sound: 'state'
+                });
+            }
+        }
+
+        // Pushes a single toast into the activity feed. Auto-dismisses via CSS animation
+        // (4s total: in + hold + out). DOM cleanup happens after the animation ends so
+        // we don't leak nodes during long sessions.
+        function showActivityToast({ text, icon, variant, sound }) {
+            const feed = document.getElementById('activity-feed');
+            if (!feed) return;
+            const el = document.createElement('div');
+            el.className = `activity-toast at-${variant || 'positive'}`;
+            el.innerHTML = `
+                <span class="at-icon">${icon || '•'}</span>
+                <span class="at-text">${text}</span>
+            `;
+            feed.appendChild(el);
+            // Remove from DOM after the out-animation completes (3.6s in + ~0.5s out).
+            setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 4200);
+
+            // Cap how many simultaneous toasts hang around — if events flood in, keep
+            // only the most recent few. Saves DOM and keeps the screen readable.
+            const MAX_TOASTS = 4;
+            while (feed.children.length > MAX_TOASTS) {
+                feed.removeChild(feed.firstChild);
+            }
+
+            playActivitySound(sound);
+        }
+
+        // Small synthesized blips for activity types. Different pitches/timbres so users
+        // can subconsciously tell types apart without looking. Quieter than dice-roll/click
+        // because activity events fire frequently — should feel ambient, not alerting.
+        function playActivitySound(kind) {
+            if (!soundEnabled) return;
+            try {
+                if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                if (audioContext.state === 'suspended') audioContext.resume();
+
+                // Each event type maps to a 2-note motif. Sine waves, low gain, short.
+                const motifs = {
+                    join:    { freqs: [523.25, 783.99], wave: 'sine', gain: 0.10 }, // C5→G5 rising
+                    submit:  { freqs: [659.25, 880.00], wave: 'sine', gain: 0.10 }, // E5→A5 rising
+                    leave:   { freqs: [523.25, 392.00], wave: 'triangle', gain: 0.09 }, // C5→G4 falling
+                    start:   { freqs: [440.00, 659.25, 880.00], wave: 'sine', gain: 0.11 }, // A4→E5→A5 fanfare
+                    resolve: { freqs: [880.00, 587.33, 440.00], wave: 'sine', gain: 0.10 }, // A5→D5→A4 settle
+                    state:   { freqs: [698.46, 698.46], wave: 'triangle', gain: 0.08 } // F5 twice (neutral ping)
+                };
+                const m = motifs[kind] || motifs.state;
+                const now = audioContext.currentTime;
+                m.freqs.forEach((f, i) => {
+                    const osc = audioContext.createOscillator();
+                    const g = audioContext.createGain();
+                    osc.type = m.wave;
+                    osc.frequency.value = f;
+                    const t = now + i * 0.07;
+                    g.gain.setValueAtTime(0, t);
+                    g.gain.linearRampToValueAtTime(m.gain, t + 0.012);
+                    g.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+                    osc.connect(g);
+                    g.connect(audioContext.destination);
+                    osc.start(t);
+                    osc.stop(t + 0.3);
+                });
+            } catch (e) {}
+        }
+
         // Now snapshot-driven instead of fetch-driven. Accepts the snapshot from the
         // onSnapshot listener so we never re-read the document — Firestore already
         // delivered fresh data. Keeps a getDoc() fallback path for the rare callers
@@ -1355,6 +1592,13 @@
             // still update normally. If anything structural changed (status, members, who has
             // submitted, the challenge text), do a full render.
             const skipInteractionRender = _isStructurallyEquivalent(_lastSnapshotData, newData);
+
+            // Detect what changed since the last snapshot and emit activity toasts for it.
+            // Skipped on the very first snapshot (initial load) — we don't want a flood of
+            // "X joined" announcing the existing group state to the user.
+            if (_lastSnapshotData) {
+                detectAndAnnounceActivity(_lastSnapshotData, newData);
+            }
 
             currentGroupData = newData;
             _lastSnapshotData = newData;
