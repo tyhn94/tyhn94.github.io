@@ -1808,10 +1808,8 @@
         // can subconsciously tell types apart without looking. Quieter than dice-roll/click
         // because activity events fire frequently — should feel ambient, not alerting.
         function playActivitySound(kind) {
-            if (!soundEnabled) return;
+            if (!ensureAudioReady()) return;
             try {
-                if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                if (audioContext.state === 'suspended') audioContext.resume();
 
                 // Each event type maps to a 2-note motif. Sine waves, low gain, short.
                 const motifs = {
@@ -3862,17 +3860,69 @@
             btn.title = soundEnabled ? 'Sounds ON (click to mute)' : 'Sounds OFF (click to enable)';
         }
 
-        function playClick() {
-            if (!soundEnabled) return;
+        // ─────────────────────────────────────────────────────────────────
+        // AudioContext lifecycle (mobile-resilient)
+        //
+        // Mobile Safari/Chrome auto-suspend the AudioContext whenever the page goes
+        // to the background (tab switch, lock screen, app switcher). They DO NOT
+        // auto-resume on return — that requires either a page-visibility nudge or
+        // a user gesture. Without these handlers, the first tap after returning
+        // either plays silently or has noticeably delayed audio while the context
+        // wakes up mid-playback.
+        //
+        // Strategy:
+        //   1. ensureAudioReady() — synchronous-ish helper every play* fn calls.
+        //      Lazy-creates the context on first sound, kicks off resume() if
+        //      suspended, and returns whether we're "ready enough" to schedule
+        //      audio nodes. The resume promise is fire-and-forget here because
+        //      callers either don't need to await (clicks happen instantly and
+        //      a missed first frame is invisible) or run on a setTimeout.
+        //   2. visibilitychange listener — proactively resume the context when
+        //      the page comes back into view, so the FIRST tap after returning
+        //      already has a running context instead of starting one.
+        //   3. pageshow listener — covers iOS Safari's bfcache restore (the
+        //      visibilitychange event isn't always reliable on bfcache hits).
+        // ─────────────────────────────────────────────────────────────────
+
+        function ensureAudioReady() {
+            if (!soundEnabled) return false;
             try {
                 if (!audioContext) {
                     audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 }
-                
                 if (audioContext.state === 'suspended') {
-                    audioContext.resume();
+                    // Resume returns a promise; we don't await it because callers run inside
+                    // a user gesture and need to schedule nodes synchronously to stay in the
+                    // "audio allowed" window. iOS will accept scheduled nodes once resume
+                    // settles a few ms later. Worst case: the very first 5-10ms of the click
+                    // is silent on a cold context — imperceptible.
+                    audioContext.resume().catch(() => {});
                 }
+                return audioContext.state !== 'closed';
+            } catch (e) {
+                return false;
+            }
+        }
 
+        // When the page comes back to the foreground, wake the context up immediately
+        // instead of waiting for the next user tap. This is what kills the "first click
+        // after switching back is silent" bug on iOS.
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible' && audioContext && audioContext.state === 'suspended') {
+                audioContext.resume().catch(() => {});
+            }
+        });
+        // bfcache restores on iOS Safari: pageshow fires with persisted=true. The audio
+        // context survives but is suspended; same resume nudge handles it.
+        window.addEventListener('pageshow', (e) => {
+            if (audioContext && audioContext.state === 'suspended') {
+                audioContext.resume().catch(() => {});
+            }
+        });
+
+        function playClick() {
+            if (!ensureAudioReady()) return;
+            try {
                 const now = audioContext.currentTime;
                 const pitchVar = 0.9 + Math.random() * 0.2;
                 
@@ -3924,13 +3974,8 @@
         // of physical dice. ~350ms total, lines up with the discoverRollIn animation.
         // Audio is fully synthesized; no asset loads.
         function playDiceRoll() {
-            if (!soundEnabled) return;
+            if (!ensureAudioReady()) return;
             try {
-                if (!audioContext) {
-                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                }
-                if (audioContext.state === 'suspended') audioContext.resume();
-
                 const startNow = audioContext.currentTime;
                 // 3 ticks — last one slightly louder to feel like a "settle".
                 const ticks = [
@@ -4116,12 +4161,9 @@
         // banner flips to its green YOU'RE ALL SET state. Quieter and shorter than the
         // round-end victory chime, since it triggers every round (don't want fanfare).
         function playSuccessChime() {
-            if (!soundEnabled) return;
+            if (!ensureAudioReady()) return;
             try {
-                let ctx = audioContext || new (window.AudioContext || window.webkitAudioContext)();
-                if (!audioContext) audioContext = ctx;
-                if (ctx.state === 'suspended') ctx.resume();
-
+                const ctx = audioContext;
                 const now = ctx.currentTime;
                 // E5 → A5 — perfect 4th rising. Universally read as "completed / OK".
                 const notes = [659.25, 880.00];
@@ -4146,13 +4188,9 @@
         }
 
         function playVictoryChime() {
-            const isMuted = localStorage.getItem("daredrop_sound") === "off";
-            if (isMuted) return;
-
+            if (!ensureAudioReady()) return;
             try {
-                let ctx = window.audioContext || new (window.AudioContext || window.webkitAudioContext)();
-                if (ctx.state === 'suspended') ctx.resume();
-
+                const ctx = audioContext;
                 const now = ctx.currentTime;
                 // Retro zafer arpeji (C5, E5, G5, C6)
                 const notes = [523.25, 659.25, 783.99, 1046.50];
