@@ -1848,11 +1848,30 @@
                 return;
             }
 
-            // If this was the user's first vote, they're now safe - update status text.
-            const statusEl = document.getElementById('survival-status');
-            if (statusEl && statusEl.innerText.includes('MUST VOTE')) {
-                statusEl.innerText = "✅ YOU ARE SAFE FROM THE KICK.";
-                statusEl.style.color = "var(--text-main)";
+            // If this was the user's first vote, they're now safe - update status text and
+            // dismiss the urgent banner with a celebrate. We deliberately AVOID
+            // refreshGroupData() here so iframes (Instagram/TikTok embeds) don't reload —
+            // that would reset every video and feel jarring. So we mirror the relevant
+            // state changes manually: status text, banner, leaderboard.
+            //
+            // Detect "was the urgent banner showing the vote prompt?" via the live element,
+            // not text-matching a specific string — admin and guest see different status
+            // wording, but both share the same banner visibility state.
+            const banner = document.getElementById('urgent-action-banner');
+            const bannerWasShowing = banner && banner.style.display !== 'none' && !banner.classList.contains('celebrate');
+            if (bannerWasShowing) {
+                const statusEl = document.getElementById('survival-status');
+                const isAdminUser = currentGroupData.adminName === currentUserName;
+                if (statusEl) {
+                    statusEl.innerText = isAdminUser
+                        ? "👑 ADMIN: All set — XP locked in."
+                        : "✅ YOU'RE ALL SET — kick-proof.";
+                    statusEl.style.color = isAdminUser ? "var(--admin-color)" : "var(--text-main)";
+                }
+                // hideUrgentBanner reads the _urgentBannerWasVisible flag (set when the
+                // banner was shown for VOTE ON THE OTHERS) and plays the green celebrate
+                // transition before hiding. Same path as a full refresh would take.
+                hideUrgentBanner();
             }
 
             // Re-render leaderboard with new XP totals (no iframes during 'active' state, so cheap).
