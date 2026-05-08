@@ -861,10 +861,29 @@
                 <div id="group-list-container"></div>
             </div>
 
+            <!-- MY SOLOS — single-player challenges where the user posts and the public votes.
+                 Solos are just groups under the hood (isSolo: true, 1 member, public-voting
+                 forced on). Reuses every group system: real-time listener, popular feed,
+                 Discover, urgent banner. Hidden until the user creates their first solo. -->
+            <div class="card" id="solos-card" style="display: none; border-color: #00ffaa;">
+                <h3 style="margin-top:0; font-size:14px; color: #00ffaa;">> 🎯 MY SOLOS</h3>
+                <p style="font-size: 11px; color: #888; margin: 0 0 10px;">Solo challenges open to public voting. They appear in Discover and Most Popular.</p>
+                <div id="solo-list-container"></div>
+            </div>
+
             <div class="card" style="border-color: #555;">
                 <h3 style="margin-top:0; font-size:14px; color:#aaa;">> CREATE NEW GROUP</h3>
                 <input type="text" id="new-group-name" placeholder="Group Name (e.g., Office Squad)...">
                 <button class="btn" id="btn-create-group" style="border-color: #aaa; color: #aaa;">Create</button>
+            </div>
+
+            <!-- CREATE NEW SOLO — separate path so users understand it's a different mode.
+                 Cyan accent (matches Discover) signals "this is for the public discovery surface." -->
+            <div class="card" style="border-color: #00ffaa;">
+                <h3 style="margin-top:0; font-size:14px; color:#00ffaa;">> 🎯 CREATE NEW SOLO</h3>
+                <p style="font-size: 11px; color: #888; margin: 0 0 10px;">Just you + the world. Public voting auto-on. Perfect for content creators.</p>
+                <input type="text" id="new-solo-name" placeholder="Solo title (e.g., My Daily Dare)...">
+                <button class="btn" id="btn-create-solo" style="border-color: #00ffaa; color: #00ffaa;">Create Solo</button>
             </div>
 
             <button class="btn" style="border-color: #555; color: #555; margin-top: 30px;" onclick="switchUser()">Switch User (Logout)</button>
@@ -1003,6 +1022,7 @@
                             Enable Public Voting
                         </label>
                         <p style="font-size: 11px; color: #888; margin: 5px 0 0 28px;">Anyone with the public link can vote anonymously. Round won't end early. Resolved rounds appear in Most Popular.</p>
+                        <p id="public-voting-solo-note" style="display: none; font-size: 11px; color: #00ffaa; margin: 5px 0 0 28px;">🎯 Solos always have public voting on — that's how they get judged.</p>
                         <p id="admin-save-status" style="font-size: 11px; color: var(--text-main); margin: 12px 0 0; text-align: right; min-height: 14px; opacity: 0; transition: opacity 0.2s;">✓ Saved</p>
                     </fieldset>
                 </div>
@@ -1373,9 +1393,11 @@
             updatePendingShareBanner();
 
             const container = document.getElementById('group-list-container');
-            
+            const soloCardEarly = document.getElementById('solos-card');
+
             if (!userData.groups || userData.groups.length === 0) {
-                container.innerHTML = "<p style='color:#888; font-size:12px;'>You are not a member of any group yet.</p>";
+                container.innerHTML = "<p style='color:#888; font-size:12px;'>No groups or solos yet — create one below.</p>";
+                if (soloCardEarly) soloCardEarly.style.display = 'none';
                 return;
             }
 
@@ -1418,9 +1440,21 @@
                 return (originalIndex.get(a.groupInfo.id) ?? 0) - (originalIndex.get(b.groupInfo.id) ?? 0);
             });
 
-            container.innerHTML = "";
+            // Split into multiplayer groups vs. solos so each gets its own list/card.
+            // The solo flag lives on the group document (canonical source); we trust that
+            // over the user-side groupInfo tag, in case of drift.
+            const groupCards = liveCards.filter(r => !r.gData.isSolo);
+            const soloCards  = liveCards.filter(r =>  r.gData.isSolo);
 
-            for (const r of liveCards) {
+            const soloContainer = document.getElementById('solo-list-container');
+            const soloCard = document.getElementById('solos-card');
+            container.innerHTML = "";
+            if (soloContainer) soloContainer.innerHTML = "";
+
+            // Helper: builds and appends a single row into a container. Same UI for solos
+            // and groups — only difference is solos never carry the "(ADMIN)" tag because
+            // they're inherently one-person-shows.
+            function buildRow(r, target, opts) {
                 const { groupInfo, gData } = r;
                 const isAdmin = gData.adminName === currentUserName;
                 const isLive = gData.challengeStatus === 'active';
@@ -1430,14 +1464,14 @@
 
                 const btn = document.createElement('button');
                 btn.className = "btn group-list-btn" + (isLive ? " group-list-btn-live" : "");
-                // Compose label: optional LIVE badge, name, optional ADMIN tag.
                 const liveBadge = isLive ? '<span class="group-live-badge"><span class="group-live-dot"></span>LIVE</span>' : '';
-                const adminTag = isAdmin ? "<span style='color:var(--admin-color); font-size:10px; font-weight:bold;'>(ADMIN)</span>" : "";
+                // Solos don't show ADMIN tag (redundant: you're always the admin of your own solo).
+                const adminTag = (!opts.isSolo && isAdmin) ? "<span style='color:var(--admin-color); font-size:10px; font-weight:bold;'>(ADMIN)</span>" : "";
                 btn.innerHTML = `${liveBadge}<span class="group-list-name">> ${escapeHtml(groupInfo.name)}</span>${adminTag}`;
                 btn.onclick = () => openDashboard(groupInfo.id);
                 row.appendChild(btn);
 
-                // Add Delete button if Admin
+                // Delete button — admin only (which for solos = always, since you own it).
                 if (isAdmin) {
                     const delBtn = document.createElement('button');
                     delBtn.className = "group-delete-btn";
@@ -1449,16 +1483,31 @@
                     row.appendChild(delBtn);
                 }
 
-                container.appendChild(row);
+                target.appendChild(row);
             }
 
+            for (const r of groupCards) buildRow(r, container, { isSolo: false });
+            for (const r of soloCards)  buildRow(r, soloContainer, { isSolo: true });
+
+            // Show/hide solos card depending on whether the user has any.
+            // The "create new solo" card stays visible regardless — it's the entry point.
+            if (soloCard) soloCard.style.display = soloCards.length > 0 ? 'block' : 'none';
+
+            // Pad valid groups list (used for cleanup write below). Already populated above
+            // from the iteration; just kept for clarity / parity with old code shape.
             // Past this point only the cleanup/scroll-class section remains.
 
-            // Add a scroll-enabling class once the list gets long enough that it would
+            // Add a scroll-enabling class once each list gets long enough that it would
             // dominate the home screen. Below the threshold we let it grow naturally;
             // above it, .scrollable bounds the height and reveals an internal scrollbar.
             const SCROLL_AT = 4;
-            container.classList.toggle('scrollable', liveCards.length > SCROLL_AT);
+            container.classList.toggle('scrollable', groupCards.length > SCROLL_AT);
+            if (soloContainer) soloContainer.classList.toggle('scrollable', soloCards.length > SCROLL_AT);
+
+            // Empty-state for groups card. Solos card has its own visibility control above.
+            if (groupCards.length === 0 && !needsDbUpdate) {
+                container.innerHTML = "<p style='color:#888; font-size:12px;'>You are not a member of any group yet.</p>";
+            }
 
             // If we found deleted groups, update the user profile in Firestore silently
             if (needsDbUpdate) {
@@ -1523,6 +1572,61 @@
             document.getElementById('new-group-name').value = "";
             document.getElementById('btn-create-group').innerText = "Create";
             
+            openDashboard(newGroupId);
+        });
+
+        // Solo creation — same group document model, three forced overrides:
+        //   - isSolo: true  (drives UI gates: hide invite tile, hide kick UI, lock public-vote
+        //                    toggle, bypass min-2-members check on START)
+        //   - publicVotingEnabled: true  (you can't vote on yourself, so the public must)
+        //   - maxMembers: 1  (defensive — even if isSolo flag is later flipped, capacity stays 1
+        //                     until admin opens it back up)
+        // Solo posts flow into popularChallenges and Discover via the same indexer that handles
+        // group public-vote rounds — no plumbing differences downstream.
+        document.getElementById('btn-create-solo').addEventListener('click', async () => {
+            const soloName = document.getElementById('new-solo-name').value.trim();
+            if(!soloName) return;
+
+            document.getElementById('btn-create-solo').innerText = "...";
+            const newGroupId = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+            const defaultCategory = challengeData.categories[0];
+            const initialSoloData = {
+                name: soloName,
+                adminName: currentUserName,
+                isSolo: true,
+                maxMembers: 1,
+                adminOnlyInvites: true, // no one else can join anyway, but defensive
+                publicVotingEnabled: true,
+                challengeDurationHours: 24,
+                challengeDurationMins: 0,
+                challengeStartTime: null,
+                challengeStatus: 'pending',
+                currentCategoryId: defaultCategory.id,
+                currentChallenge: defaultCategory.challenges[0] || "Make up your own dare.",
+                members: [currentUserName],
+                submissions: {},
+                leaderboard: { [currentUserName]: 0 },
+                challengeHistory: [],
+                historyIndex: 0,
+                createdAt: new Date()
+            };
+
+            await setDoc(doc(db, "groups", newGroupId), initialSoloData);
+
+            // Tag the user-side membership entry so renderMyGroups can split solos out without
+            // re-fetching every group document (we still fetch them for live-status, but the
+            // tag means we can build the right list from the start).
+            const groupInfo = { id: newGroupId, name: soloName, isSolo: true };
+            const userRefId = currentUserName.toLowerCase();
+            await updateDoc(doc(db, "users", userRefId), {
+                groups: arrayUnion(groupInfo)
+            });
+
+            userData.groups.push(groupInfo);
+            document.getElementById('new-solo-name').value = "";
+            document.getElementById('btn-create-solo').innerText = "Create Solo";
+
             openDashboard(newGroupId);
         });
 
@@ -1914,8 +2018,18 @@
             }
 
             document.getElementById('display-group').innerText = currentGroupData.name;
-            document.getElementById('current-count').innerText = currentGroupData.members.length;
-            document.getElementById('max-count').innerText = currentGroupData.maxMembers;
+            // Members pill: for solos the "1/1" count is meaningless filler — replace it with
+            // a "🎯 Solo" badge so users know what mode they're in at a glance.
+            const membersPill = document.querySelector('.dash-members-pill');
+            if (currentGroupData.isSolo) {
+                if (membersPill) membersPill.innerHTML = '🎯 Solo';
+            } else {
+                if (membersPill) {
+                    membersPill.innerHTML = '<span id="current-count">0</span>/<span id="max-count">10</span>';
+                }
+                document.getElementById('current-count').innerText = currentGroupData.members.length;
+                document.getElementById('max-count').innerText = currentGroupData.maxMembers;
+            }
             
             const activeChallenge = currentGroupData.currentChallenge || (challengeData.categories[0]?.challenges[0]) || "-";
             document.getElementById('daily-challengeText').innerText = '"' + activeChallenge + '"';
@@ -1930,7 +2044,18 @@
                 document.getElementById('challenge-hours-input').value = currentGroupData.challengeDurationHours !== undefined ? currentGroupData.challengeDurationHours : 24;
                 document.getElementById('challenge-mins-input').value = currentGroupData.challengeDurationMins || 0;
                 document.getElementById('admin-invite-checkbox').checked = currentGroupData.adminOnlyInvites;
-                document.getElementById('public-voting-checkbox').checked = !!currentGroupData.publicVotingEnabled;
+                const pvCheckbox = document.getElementById('public-voting-checkbox');
+                pvCheckbox.checked = !!currentGroupData.publicVotingEnabled;
+                // Solos require public voting (you can't vote on yourself). Disable the
+                // toggle so the admin can't accidentally cripple their own solo. Visual
+                // hint: the row gets greyed out via fieldset's :disabled styling, and we
+                // surface a one-line note below.
+                pvCheckbox.disabled = !!currentGroupData.isSolo;
+                const pvNote = document.getElementById('public-voting-solo-note');
+                if (pvNote) pvNote.style.display = currentGroupData.isSolo ? 'block' : 'none';
+
+                // Solo also forces max-members = 1; we lock the input to keep it that way.
+                document.getElementById('max-members-input').disabled = !!currentGroupData.isSolo;
 
                 // Update category pill display
                 const cat = getCategoryById(currentGroupData.currentCategoryId);
@@ -1950,8 +2075,11 @@
             }
 
             // Invite tile — hidden if admin-only-invites is on and user isn't admin.
+            // ALSO hidden for solos: the whole point of a solo is one person + public vote;
+            // there's no group to invite into.
+            const isSolo = !!currentGroupData.isSolo;
             const inviteBtn = document.getElementById('btn-copy-invite');
-            inviteBtn.style.display = (currentGroupData.adminOnlyInvites && !isAdmin) ? 'none' : 'flex';
+            inviteBtn.style.display = (isSolo || (currentGroupData.adminOnlyInvites && !isAdmin)) ? 'none' : 'flex';
 
             // Public voting tile — three states:
             //   1. Public voting ON  → coloured "Public vote" share tile (active button).
@@ -2000,7 +2128,9 @@
                 if (isAdmin && !skipInteractionRender) {
                     // Need at least one other member before the round can start — single-person
                     // groups can't actually play (no one to vote on, no one to vote for).
-                    if (currentGroupData.members.length < 2) {
+                    // EXCEPTION: solos. The whole point is one person + public votes, so the
+                    // min-2 check doesn't apply; the admin (= sole member) can start solo.
+                    if (!currentGroupData.isSolo && currentGroupData.members.length < 2) {
                         interactionDiv.innerHTML = `
                             <p style="color: var(--admin-color); font-size: 13px; text-align: center; padding: 12px; border: 1px dashed var(--admin-color);">
                                 Invite at least one more person to start the round.
@@ -2172,12 +2302,15 @@
         }
 
         window.startChallengeNow = async function() {
-            // Defensive: even if the start button was force-shown via devtools, refuse to start solo.
-            if (!currentGroupData || (currentGroupData.members || []).length < 2) {
+            // Defensive: even if the start button was force-shown via devtools, refuse to
+            // start a multiplayer round solo. Solos are exempt — they're SUPPOSED to be one
+            // person + the public.
+            if (!currentGroupData) return;
+            if (!currentGroupData.isSolo && (currentGroupData.members || []).length < 2) {
                 alert("You need at least 2 members in the group to start a challenge.");
                 return;
             }
-            if(!confirm("Start the countdown for everyone now?")) return;
+            if(!confirm("Start the countdown now?")) return;
             await updateDoc(doc(db, "groups", currentGroupId), {
                 challengeStatus: 'active',
                 challengeStartTime: Date.now()
@@ -2739,6 +2872,12 @@
             saveAdminFields({ adminOnlyInvites: e.target.checked });
         });
         document.getElementById('public-voting-checkbox').addEventListener('change', (e) => {
+            // Defensive: solos require public voting; refuse to write a falsy value even
+            // if something bypasses the disabled attribute (devtools, race condition).
+            if (currentGroupData && currentGroupData.isSolo && !e.target.checked) {
+                e.target.checked = true;
+                return;
+            }
             saveAdminFields({ publicVotingEnabled: e.target.checked });
         });
 
