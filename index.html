@@ -791,6 +791,24 @@
                 color: var(--bg-color) !important;
             }
         }
+        /* Leave-group button — quietly grey by default so it doesn't compete visually
+           with reroll/history. Goes red on hover to signal "this removes you" without
+           shouting at idle. Sized small (flex:0) since it's a rarely-used escape hatch,
+           not an everyday action. */
+        .dash-leave {
+            border-color: #555 !important;
+            color: #888 !important;
+            flex: 0 0 auto !important;
+            padding-left: 14px !important;
+            padding-right: 14px !important;
+        }
+        @media (hover: hover) {
+            .dash-leave:hover:not(:disabled) {
+                background: var(--text-accent) !important;
+                color: var(--bg-color) !important;
+                border-color: var(--text-accent) !important;
+            }
+        }
     </style>
 </head>
 <body>
@@ -1042,10 +1060,11 @@
                 </div>
             </details>
 
-            <!-- Bottom action row: reroll (admin), history. Compact horizontal layout. -->
+            <!-- Bottom action row: reroll (admin), history, leave (non-admin pre-submit). -->
             <div class="dash-actions">
                 <button class="btn btn-admin" id="btn-reroll" style="display: none;">↻ Reroll Round</button>
                 <button class="btn dash-secondary" onclick="window.showHistory()">📜 Past Rounds</button>
+                <button class="btn dash-leave" id="btn-leave-group" style="display: none;" onclick="window.leaveGroup()">🚪 Leave</button>
             </div>
         </div>
 
@@ -1711,6 +1730,15 @@
             // "X joined / Y submitted" toasts for what is actually the existing state of
             // the new group.
             _lastSnapshotData = null;
+            // Stop any ticking countdown — leaving the dashboard means the display element
+            // is gone (or about to be); a still-running interval would either error trying
+            // to write into it, or worse, fire resolveChallengeAndKick() in the background
+            // for a group the user is no longer viewing.
+            if (countdownTimer) {
+                clearInterval(countdownTimer);
+                countdownTimer = null;
+            }
+            _countdownDeadline = null;
         }
 
         async function openDashboard(groupId) {
@@ -2038,6 +2066,17 @@
             document.getElementById('btn-reroll').style.display = isAdmin ? 'block' : 'none';
             // Premium feature gate — custom challenge panel only for admin + premium user.
             document.getElementById('superuser-panel').style.display = (isAdmin && isPremiumUser()) ? 'block' : 'none';
+
+            // Leave-group button visibility: non-admins can voluntarily leave, but ONLY if
+            // they haven't submitted yet. Once submitted, their entry is in the round and
+            // bailing would corrupt the leaderboard / vote chain. Solos hidden (single-
+            // player groups don't have a "leave" concept — the admin owns and deletes them).
+            const leaveBtn = document.getElementById('btn-leave-group');
+            if (leaveBtn) {
+                const hasSubmittedYet = !!(currentGroupData.submissions && currentGroupData.submissions[currentUserName]);
+                const canLeave = !isAdmin && !currentGroupData.isSolo && !hasSubmittedYet;
+                leaveBtn.style.display = canLeave ? 'block' : 'none';
+            }
             
             if(isAdmin) {
                 document.getElementById('max-members-input').value = currentGroupData.maxMembers;
@@ -2124,6 +2163,7 @@
                     clearInterval(countdownTimer);
                     countdownTimer = null;
                 }
+                _countdownDeadline = null;
                 
                 if (isAdmin && !skipInteractionRender) {
                     // Need at least one other member before the round can start — single-person
@@ -2146,10 +2186,13 @@
                 // Stop the countdown explicitly and reset the display. Without this the
                 // last "00:00:42" frame stayed frozen on screen even though the timer
                 // had stopped — gave the impression the countdown was still running.
+                // Resetting _countdownDeadline too so the next round (different deadline)
+                // forces a fresh start instead of being suppressed by the idempotency check.
                 if (countdownTimer) {
                     clearInterval(countdownTimer);
                     countdownTimer = null;
                 }
+                _countdownDeadline = null;
                 document.getElementById('time-remaining-display').innerText = "--:--:--";
                 document.getElementById('time-remaining-display').style.color = "#666";
             } else {
@@ -2298,6 +2341,7 @@
                 // this, but this catches any edge case where neither branch ran.
                 clearInterval(countdownTimer);
                 countdownTimer = null;
+                _countdownDeadline = null;
             }
         }
 
@@ -2729,40 +2773,61 @@
             });
         }
 
-        function startCountdown() {
-            if (countdownTimer) clearInterval(countdownTimer);
+        // Tracks the deadline of the currently running interval so we can avoid tearing
+        // down + recreating the timer when an unrelated snapshot arrives (vote cast,
+        // submission posted, settings tweak). Without this, every Firestore change in an
+        // active round caused a 1-second display freeze while we waited for the new
+        // interval's first tick — looked like the countdown was "restarting from scratch."
+        let _countdownDeadline = null;
 
+        function startCountdown() {
             const startTime = currentGroupData.challengeStartTime || Date.now();
             const durationHours = currentGroupData.challengeDurationHours !== undefined ? currentGroupData.challengeDurationHours : 24;
             const durationMins = currentGroupData.challengeDurationMins || 0;
-            
+
             const totalMs = (durationHours * 60 * 60 * 1000) + (durationMins * 60 * 1000);
             const deadline = startTime + totalMs;
-            
+
             const displayEl = document.getElementById('time-remaining-display');
 
-            countdownTimer = setInterval(() => {
-                const now = Date.now();
-                const timeLeft = deadline - now;
-
+            // Render the current frame synchronously so the display is correct the moment
+            // this function returns — don't wait for setInterval's first 1-second tick,
+            // which used to leave stale text or "--:--:--" visible during dashboard re-entry.
+            function renderTick() {
+                const timeLeft = _countdownDeadline - Date.now();
                 if (timeLeft > 0) {
-                    const hoursLeft = Math.floor(timeLeft / (1000 * 60 * 60));
-                    const minutesLeft = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
-                    const secondsLeft = Math.floor((timeLeft % (1000 * 60)) / 1000);
-                    
-                    displayEl.innerText = `${String(hoursLeft).padStart(2,'0')}:${String(minutesLeft).padStart(2,'0')}:${String(secondsLeft).padStart(2,'0')}`;
+                    const h = Math.floor(timeLeft / (1000 * 60 * 60));
+                    const m = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+                    const s = Math.floor((timeLeft % (1000 * 60)) / 1000);
+                    displayEl.innerText = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
                     displayEl.style.color = "var(--timer-color)";
                 } else {
                     displayEl.innerText = "TIME'S UP! RESOLVING...";
                     displayEl.style.color = "var(--text-accent)";
-                    clearInterval(countdownTimer);
-                    countdownTimer = null;
-                    
-                    if(currentGroupData.challengeStatus === 'active') {
+                    if (countdownTimer) {
+                        clearInterval(countdownTimer);
+                        countdownTimer = null;
+                    }
+                    _countdownDeadline = null;
+                    if (currentGroupData.challengeStatus === 'active') {
                         resolveChallengeAndKick();
                     }
                 }
-            }, 1000);
+            }
+
+            // Idempotency: if a timer is already running for THIS deadline, leave it alone.
+            // Just re-render the current frame in case the display was clobbered by something
+            // upstream (e.g. a sibling render that wrote into the same element).
+            if (countdownTimer && _countdownDeadline === deadline) {
+                renderTick();
+                return;
+            }
+
+            // Different (or no) deadline → tear down the old interval and start fresh.
+            if (countdownTimer) clearInterval(countdownTimer);
+            _countdownDeadline = deadline;
+            renderTick(); // sync first frame — no 1-second blank gap
+            countdownTimer = setInterval(renderTick, 1000);
         }
 
         // Auto-save helper for admin settings. Updates Firestore, mirrors locally, flashes status.
@@ -2989,6 +3054,40 @@
             // Listener fires for everyone in the group — kicked user's own client also gets
             // the snapshot and bounces them out via the not-a-member check in refreshGroupData.
         }
+
+        // Voluntary leave — non-admin members can drop a group as long as they haven't
+        // submitted yet. Once they've submitted there's a vote chain that depends on their
+        // entry being voteable; bailing mid-round would distort the leaderboard. Solos and
+        // admin-owned groups don't expose this (admin uses the "X" delete from the menu,
+        // and solos are inherently single-player so there's no group to leave).
+        window.leaveGroup = async function() {
+            if (!currentGroupData) return;
+            const isAdmin = currentGroupData.adminName === currentUserName;
+            if (isAdmin) return alert("Admins can't leave their own group — delete it from the menu instead.");
+
+            const hasSubmitted = !!(currentGroupData.submissions && currentGroupData.submissions[currentUserName]);
+            if (hasSubmitted) {
+                return alert("You can't leave after submitting — your entry is part of this round's voting.");
+            }
+
+            if (!confirm(`Leave "${currentGroupData.name}"? You can rejoin later via the invite link.`)) return;
+
+            // Drop ourselves from the group's members array. The group listener fires for
+            // everyone (including us); our own client's refreshGroupData detects we're no
+            // longer a member and bounces us back to My Groups.
+            const updatedMembers = currentGroupData.members.filter(m => m !== currentUserName);
+            await updateDoc(doc(db, "groups", currentGroupId), {
+                members: updatedMembers
+            });
+            // Mirror the change on the user side so My Groups doesn't show the stale entry
+            // until the next listener-driven cleanup pass.
+            await removeGroupFromUserProfile(currentGroupId);
+            // Local state matches Firestore.
+            userData.groups = (userData.groups || []).filter(g => g.id !== currentGroupId);
+            // Bounce out — the listener-driven bounce is also wired up but explicit nav is
+            // snappier and avoids a moment of "dashboard for a group I'm not in" flash.
+            window.renderMyGroups();
+        };
 
         // Generic share helper — opens the native OS share sheet (one tap to WhatsApp /
         // Messages / Telegram on mobile) AND writes to clipboard in parallel. The clipboard
